@@ -420,6 +420,51 @@
     // '2026-08-25': { type: 'speed', title: '速度日（调整）', venue: '田径场', duration: '50min', warmup: '...', main: [{ name: '...', sets: 1, reps: '...', pace: '...', rest: '...' }], note: '...' }
   };
 
+  // 每个练习项的「侧重点」与「强度」标注（名称关键词规则；override/自定义未标注时也用此函数）
+  function annotateItem(m) {
+    if (!m || (m.focus && m.intensity)) return m;
+    const n = String(m.name || '');
+    const d = String(m.detail || '') + String(m.pace || '') + String(m.reps || '');
+    let focus = '技术', intensity = '中';
+    // 速度 / 冲刺
+    if (/^(30m|60m|100m|150m|200m|300m|400m|500m测验)$/.test(n)) {
+      focus = '速度';
+      intensity = /^(30m|60m)$/.test(n) ? '中' : (/^(100m|400m|500m测验)$/.test(n) ? '峰值' : '高');
+    } else if (/加速跑|飞跑|起跑练习|冲刺/.test(n + d)) {
+      focus = '速度';
+      intensity = /加速跑|飞跑/.test(n) ? '高' : '峰值';
+    }
+    // 爆发 / 弹跳
+    else if (/跳深|跳箱|跨步跳|立定跳远|纵跳|摸高/.test(n)) {
+      focus = '爆发';
+      intensity = /小跳|跳箱\(30|跳箱\(30-45/.test(n) ? '低' : (/跳深|跨步跳/.test(n) ? '高' : (/摸高|纵跳/.test(n) ? '峰值' : '中'));
+    }
+    // 力量
+    else if (/深蹲|硬拉|RDL|分腿蹲|划船|卧推|推举|引体|面拉|侧平举|提踵/.test(n)) {
+      focus = '力量';
+      const heavy = /深蹲|硬拉|RDL/.test(n);
+      intensity = heavy ? (/深蹲/.test(n) ? '高' : '高') : '中';
+      if (/深蹲/.test(n) && /90%/.test(d)) intensity = '峰值';
+      if (/相扑硬拉|杠铃深蹲/.test(n) && /@9/.test(d)) intensity = '峰值';
+      if (/@8[5-9]/.test(d)) intensity = '高';
+      if (/轻|减量|@7/.test(d)) intensity = '中';
+      if (/@6/.test(d)) intensity = '低';
+    }
+    // 耐力 / 有氧
+    else if (/Zone2|慢跑|放松跑|轻松跑|有氧|排球/.test(n)) {
+      focus = /放松跑|轻松跑|散步/.test(n) ? '恢复' : '耐力';
+      intensity = /放松跑|轻松跑|散步|慢走/.test(n) ? '低' : (/排球/.test(n) ? '中' : '中');
+    }
+    // 核心
+    else if (/核心|平板|卷腹|举腿/.test(n)) { focus = '核心'; intensity = '中'; }
+    // 柔韧 / 恢复
+    else if (/拉伸|灵活性|柔韧/.test(n + d)) { focus = '柔韧'; intensity = '低'; }
+    else if (/散步|拉伸|恢复|轻量|塑形/.test(n)) { focus = '恢复'; intensity = '低'; }
+    else if (/技术|drills|skip/.test(n + d)) { focus = '技术'; intensity = '低'; }
+    else if (/体重|体脂/.test(n)) { focus = '恢复'; intensity = '低'; }
+    return Object.assign({}, m, { focus: focus, intensity: intensity });
+  }
+
   function sexRule(week, day, type) {
     if (week === 12) return { allowed: false, reason: '测验周禁欲' };
     if (week === 11 && day >= 6) return { allowed: false, reason: '测试前48h禁欲' };
@@ -483,7 +528,7 @@
       venue: tmpl.venue,
       duration: tmpl.duration,
       warmup: tmpl.warmup,
-      main: tmpl.main,
+      main: (tmpl.main || []).map(annotateItem),
       note: tmpl.note,
       sleep: COMMON_SLEEP,
       sex: sex,
@@ -516,6 +561,6 @@
     }
   };
 
-  if (typeof window !== 'undefined') { window.PLAN = PLAN; window.COACH_OVERRIDES = COACH_OVERRIDES; }
+  if (typeof window !== 'undefined') { window.PLAN = PLAN; window.COACH_OVERRIDES = COACH_OVERRIDES; window.PLAN_ANNOTATE = annotateItem; }
   if (typeof module !== 'undefined' && module.exports) module.exports = PLAN;
 })();

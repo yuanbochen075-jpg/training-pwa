@@ -79,13 +79,15 @@
           <label class="field-label">深睡（分钟） <input type="number" id="sl-deep" min="0" max="600" value="90"></label>
           <label class="field-label">浅睡（分钟） <input type="number" id="sl-light" min="0" max="600" value="240"></label>
           <label class="field-label">REM（分钟） <input type="number" id="sl-rem" min="0" max="600" value="90"></label>
+          <label class="field-label">入睡耗时（分钟，可空） <input type="number" id="sl-latency" min="0" max="300" placeholder="如 15"></label>
+          <label class="field-label">夜间清醒（分钟，可空） <input type="number" id="sl-wakeup" min="0" max="600" placeholder="如 10"></label>
           <label class="field-label">个人状态（1-10） <input type="number" id="sl-state" min="1" max="10" value="7"></label>
           <label class="field-label">备注 <input type="text" id="sl-note" placeholder="可选"></label>
           <button class="btn primary" id="btn-save-sleep">保存睡眠记录</button>
           <span class="form-msg" id="sleepMsg"></span>
         </div>
         <div class="auto-eval" id="sleepAutoEval">自动评测：—</div>
-        <div class="sub" style="margin-top:6px">自动评分：时长7.5-8h / 深睡13-23% / REM 20-25% / 入睡23:00±30min；综合=自动60%+个人40%</div>
+        <div class="sub" style="margin-top:6px">自动评分：时长7-9h / 效率≥85% / 深睡16-20% / REM 21-30% / 入睡23:00±30min / 规律性(近7天入睡时点稳定)；综合=自动70%+个人30%</div>
       </div>
       <div class="card"><div class="card-title">📅 近7天睡眠</div><div id="sleepHistory">—</div></div>
       <div class="card"><div class="card-title">📊 本周平均</div><div id="sleepWeekAvg">—</div></div>
@@ -120,6 +122,7 @@
           <label class="field-label">手淫次数（今天）<input type="number" id="ck-mast" min="0" max="5" value="0"></label>
           <label class="field-label">晨重（kg，可空）<input type="text" id="ck-weight" placeholder="如 67.2"></label>
           <label class="field-label">主观疲劳 RPE（6-20）<input type="number" id="ck-rpe" min="6" max="20" placeholder="休息日可空"></label>
+          <label class="field-label">实际训练时长（分钟，可空）<input type="number" id="ck-duration" min="0" max="600" placeholder="不填则用计划时长"></label>
           <label class="field-label">备注<input type="text" id="ck-note" placeholder="可选"></label>
           <button class="btn primary" id="btn-save-checkin">保存打卡</button>
           <span class="form-msg" id="checkinMsg"></span>
@@ -131,6 +134,7 @@
     <!-- 统计 -->
     <section id="tab-stats" class="tab-panel">
       <div class="card"><div class="card-title">📊 本周统计</div><div id="weekStats">—</div></div>
+      <div class="card"><div class="card-title">🏋️ 训练负荷（周/月）</div><div id="loadStats">—</div></div>
       <div class="card"><div class="card-title">📈 本月统计</div><div id="monthStats">—</div></div>
       <div class="card"><div class="card-title">⚖️ 体重趋势</div><div id="weightTrend">—</div></div>
     </section>
@@ -159,6 +163,19 @@
             </select>
           </label>
           <label class="field-label">组次/次数/时长/配速目标 <input type="text" id="ex-detail" placeholder="如：4×10次 / 30min / 5'00&quot;/km"></label>
+          <label class="field-label">强度
+            <select id="ex-intensity">
+              <option value="">自动推断</option>
+              <option>低</option><option>中</option><option>高</option><option>峰值</option>
+            </select>
+          </label>
+          <label class="field-label">侧重点
+            <select id="ex-focus">
+              <option value="">自动推断</option>
+              <option>速度</option><option>力量</option><option>爆发</option><option>耐力</option>
+              <option>技术</option><option>核心</option><option>恢复</option><option>柔韧</option>
+            </select>
+          </label>
           <label class="field-label">颜色 <input type="color" id="ex-color" value="#ffb84d"></label>
           <label class="field-label">备注 <input type="text" id="ex-note" placeholder="可选"></label>
           <button class="btn primary" id="btn-save-ex">保存项目</button>

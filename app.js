@@ -32,6 +32,16 @@
     else mm.note = (mm.note ? mm.note + '；' : '') + suffix;
     return mm;
   }
+  // 侧重点标签 + 强度徽章
+  const FOCUS_COLORS = { '速度': '#4fc3f7', '力量': '#ffb74d', '爆发': '#ff7043', '耐力': '#81c784', '技术': '#ba68c8', '核心': '#4dd0e1', '恢复': '#90a4ae', '柔韧': '#aed581' };
+  const INTEN_CLASS = { '低': 'int-low', '中': 'int-med', '高': 'int-high', '峰值': 'int-peak' };
+  function exBadges(m) {
+    const a = window.PLAN_ANNOTATE ? window.PLAN_ANNOTATE(m) : m;
+    let s = '';
+    if (a.focus) s += '<span class="ex-focus" style="color:' + (FOCUS_COLORS[a.focus] || '#9aa7b8') + '">' + esc(a.focus) + '</span>';
+    if (a.intensity) s += '<span class="ex-int ' + (INTEN_CLASS[a.intensity] || 'int-med') + '">' + esc(a.intensity) + '</span>';
+    return s;
+  }
 
   const PLAN = window.PLAN;
   if (!PLAN) { document.body.innerHTML = '<p style="padding:20px">plan-data.js 加载失败</p>'; return; }
@@ -295,6 +305,42 @@
   }
   function minFromHM(s) { if (!s) return null; const p = String(s).split(':').map(Number); return (p.length < 2 || isNaN(p[0]) || isNaN(p[1])) ? null : p[0] * 60 + p[1]; }
   function rangeMin(bedtime, wake) { const b = minFromHM(bedtime), w = minFromHM(wake); if (b == null || w == null) return null; let d = w - b; if (d <= 0) d += 1440; return d; }
+  // 睡眠评分：主流可穿戴方法论（时长/效率/入睡时点/规律性/深睡/REM/主观）
+  // 权重：时长25% 效率20% 时点15% 规律性15% 深睡10% REM10% 主观5%；缺失维度归一化
+  function sleepPctScore(pct, lo, hi, llo, lhi) {
+    if (pct >= lo && pct <= hi) return 10;
+    if (pct >= llo && pct <= lhi) return 7;
+    if (pct >= lo - 5 && pct <= hi + 5) return 5;
+    return 2;
+  }
+  function sleepBedtimeScore(b) {
+    if (b == null) return null;
+    const target = 23 * 60;
+    let diff = Math.abs(b - target);
+    if (diff > 720) diff = 1440 - diff;
+    if (diff <= 30) return 10;
+    if (diff <= 60) return 8;
+    if (diff <= 120) return 5;
+    return 2;
+  }
+  // 入睡时点标准差（分钟）：≤30min 满分，逐级递减
+  function bedtimeConsistencyScore() {
+    const arr = [];
+    Object.keys(sleeps).forEach(function (d) {
+      const x = sleeps[d];
+      const b = x && minFromHM(x.bedtime);
+      if (b != null) arr.push(b);
+    });
+    if (arr.length < 3) return null;
+    const mean = arr.reduce(function (a, v) { return a + v; }, 0) / arr.length;
+    const variance = arr.reduce(function (a, v) { return a + (v - mean) * (v - mean); }, 0) / arr.length;
+    const sd = Math.sqrt(variance);
+    if (sd <= 30) return 10;
+    if (sd <= 45) return 8;
+    if (sd <= 60) return 6;
+    if (sd <= 90) return 3;
+    return 1;
+  }
   function autoSleepScore(s) {
     const range = rangeMin(s.bedtime, s.wake);
     const deep = Number(s.deep) || 0, light = Number(s.light) || 0, rem = Number(s.rem) || 0;
@@ -302,22 +348,55 @@
     const total = range != null ? range : stages;
     if (!total) return { score: null, parts: [] };
     const parts = [];
-    const durScore = Math.max(0, Math.min(10, 10 - Math.max(0, 450 - total) / 30));
-    parts.push({ name: '时长', weight: 0.4, score: durScore, text: fmtMin(total) });
-    let bedScore = 5;
+    let weightSum = 0;
+    // 时长：7-9h 满分；6-7h / 9-10h 递减；<6h 或 >10h 低分
+    if (total > 0) {
+      const durScore = total >= 420 && total <= 540 ? 10 : total >= 360 && total <= 600 ? 7 : total >= 300 ? 4 : 2;
+      parts.push({ name: '时长', weight: 0.25, score: durScore, text: fmtMin(total) });
+      weightSum += 0.25;
+    }
+    // 效率 = 睡着时间 / 躺床时间（>=85% 满分）
+    const latency = Math.max(0, Number(s.latency) || 0);
+    const wakeup = Math.max(0, Number(s.wakeup) || 0);
+    const inBed = total + latency + wakeup;
+    if (inBed > 0 && total > 0) {
+      const eff = total / inBed * 100;
+      const effScore = eff >= 90 ? 10 : eff >= 85 ? 9 : eff >= 80 ? 7 : eff >= 70 ? 4 : 2;
+      parts.push({ name: '效率', weight: 0.2, score: effScore, text: Math.round(eff) + '%' });
+      weightSum += 0.2;
+    } else if (total > 0) {
+      // 未填入睡耗时/清醒时，按深睡+REM 之外的时长视为效率信息（保守按中上）
+      parts.push({ name: '效率', weight: 0.2, score: 7, text: '未填' });
+      weightSum += 0.2;
+    }
+    // 入睡时点（23:00 目标）
     const b = minFromHM(s.bedtime);
-    if (b != null) { const target = 23 * 60; let diff = Math.abs(b - target); if (diff > 720) diff = 1440 - diff; bedScore = diff <= 30 ? 10 : diff <= 60 ? 7 : diff <= 120 ? 4 : 2; }
-    parts.push({ name: '入睡', weight: 0.2, score: bedScore, text: s.bedtime || '' });
-    let weightSum = 0.6;
+    const bedScore = sleepBedtimeScore(b);
+    if (bedScore != null) {
+      parts.push({ name: '入睡', weight: 0.15, score: bedScore, text: s.bedtime || '' });
+      weightSum += 0.15;
+    }
+    // 规律性（近7天入睡时点一致性）
+    const cons = bedtimeConsistencyScore();
+    if (cons != null) {
+      parts.push({ name: '规律', weight: 0.15, score: cons, text: '近' + Object.keys(sleeps).length + '天' });
+      weightSum += 0.15;
+    }
+    // 深睡占比 16-20%、REM 21-30%
     if (stages > 0) {
       const deepPct = deep / stages * 100, remPct = rem / stages * 100;
-      const pctScore = function (pct, lo, hi, llo, lhi) { if (pct >= lo && pct <= hi) return 10; if (pct >= llo && pct <= lhi) return 7; return 3; };
-      parts.push({ name: '深睡', weight: 0.2, score: pctScore(deepPct, 13, 23, 10, 25), text: Math.round(deepPct) + '%' });
-      parts.push({ name: 'REM', weight: 0.2, score: pctScore(remPct, 20, 25, 15, 28), text: Math.round(remPct) + '%' });
-      weightSum = 1;
+      parts.push({ name: '深睡', weight: 0.1, score: sleepPctScore(deepPct, 16, 20, 13, 23), text: Math.round(deepPct) + '%' });
+      parts.push({ name: 'REM', weight: 0.1, score: sleepPctScore(remPct, 21, 30, 15, 28), text: Math.round(remPct) + '%' });
+      weightSum += 0.2;
     }
-    const score = parts.reduce(function (acc, p) { return acc + p.score * p.weight; }, 0) / weightSum;
-    return { score: Math.round(score * 10) / 10, parts: parts };
+    // 个人主观状态（1-10）
+    const state = Number(s.state) || Number(s.quality) || 0;
+    if (state > 0) {
+      parts.push({ name: '主观', weight: 0.05, score: state, text: state + '/10' });
+      weightSum += 0.05;
+    }
+    const score = weightSum > 0 ? parts.reduce(function (acc, p) { return acc + p.score * p.weight; }, 0) / weightSum : null;
+    return { score: score != null ? Math.round(score * 10) / 10 : null, parts: parts };
   }
   function sleepStatus() {
     const s = sleeps[currentDate];
@@ -325,7 +404,7 @@
     const auto = autoSleepScore(s);
     const personal = Number(s.state) || Number(s.quality) || 0;
     const autoScore = auto.score != null ? auto.score : personal;
-    const combined = Math.round((autoScore * 0.6 + personal * 0.4) * 10) / 10;
+    const combined = Math.round((autoScore * 0.7 + personal * 0.3) * 10) / 10;
     let level, label;
     if (combined < 5 || autoScore <= 3 || (personal > 0 && personal <= 2)) { level = 'low'; label = '恢复不足'; }
     else if (combined < 7) { level = 'light'; label = '轻度疲劳'; }
@@ -401,7 +480,7 @@
     if (p.main && p.main.length) {
       html += '<ul class="exercise-list">';
       p.main.forEach(function (m) {
-        html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>';
+        html += '<li><span class="exercise-name">' + esc(m.name) + exBadges(m) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>';
       });
       html += '</ul>';
     }
@@ -443,7 +522,8 @@
     if (items.length) {
       html += '<ul class="exercise-list">';
       items.forEach(function (it, i) {
-        html += '<li><span class="exercise-name">' + esc(it.name) + '</span><span class="exercise-detail">' + esc(it.detail || '') + ' <button class="btn mini" data-rm="' + i + '">移除</button></span></li>';
+        const a = window.PLAN_ANNOTATE ? window.PLAN_ANNOTATE(it) : it;
+        html += '<li><span class="exercise-name">' + esc(it.name) + exBadges(a) + '</span><span class="exercise-detail">' + esc(it.detail || '') + ' <button class="btn mini" data-rm="' + i + '">移除</button></span></li>';
       });
       html += '</ul>';
     }
@@ -454,7 +534,7 @@
       const id = sel.value;
       if (!id) return;
       const e = exercises[id];
-      const arr = (dayItems[currentDate] || []).concat([{ name: e.name, detail: e.detail || '', cat: e.cat || '', color: e.color || '' }]);
+      const arr = (dayItems[currentDate] || []).concat([{ name: e.name, detail: e.detail || '', cat: e.cat || '', color: e.color || '', intensity: e.intensity || '', focus: e.focus || '' }]);
       dayItems[currentDate] = arr;
       await saveDayItems(currentDate, arr);
       renderDayCustom();
@@ -563,7 +643,7 @@
     let html = '<div class="kv"><b>' + esc(next.title) + '</b><span class="val"> ' + esc(next.venue) + ' · ' + esc(next.duration) + '</span></div>';
     if (next.main && next.main.length) {
       html += '<ul class="exercise-list">';
-      next.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>'; });
+      next.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + exBadges(m) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>'; });
       html += '</ul>';
     }
     const sex = next.sex || {};
@@ -582,6 +662,8 @@
     $('sl-light').value = s.light != null ? s.light : 240;
     $('sl-rem').value = s.rem != null ? s.rem : 90;
     $('sl-state').value = (s.state != null ? s.state : (s.quality != null ? s.quality : 7));
+    $('sl-latency').value = s.latency != null ? s.latency : '';
+    $('sl-wakeup').value = s.wakeup != null ? s.wakeup : '';
     $('sl-note').value = s.note || '';
   }
   function readSleepForm() {
@@ -593,6 +675,8 @@
       rem: Math.max(0, parseInt($('sl-rem').value, 10) || 0),
       state: Math.max(1, Math.min(10, parseInt($('sl-state').value, 10) || 7)),
       quality: Math.max(1, Math.min(10, parseInt($('sl-state').value, 10) || 7)),
+      latency: Math.max(0, parseInt($('sl-latency').value, 10) || 0),
+      wakeup: Math.max(0, parseInt($('sl-wakeup').value, 10) || 0),
       note: $('sl-note').value.trim()
     };
   }
@@ -604,7 +688,7 @@
     if (res.score == null) { box.innerHTML = '自动评测：—（请填写入睡/起床时间）'; return; }
     const grade = res.score >= 8 ? '优秀' : res.score >= 6 ? '尚可' : '较差';
     const personal = Number(s.state) || 0;
-    const combined = Math.round((res.score * 0.6 + personal * 0.4) * 10) / 10;
+    const combined = Math.round((res.score * 0.7 + personal * 0.3) * 10) / 10;
     box.innerHTML = '自动评测：<b>' + res.score + '/10（' + grade + '）</b>　个人状态：' + personal + '　综合：' + combined + '<br>' + res.parts.map(function (p) { return p.name + ' ' + p.score + '分'; }).join(' · ');
   }
   async function onSaveSleep() {
@@ -672,6 +756,7 @@
     $('ck-mast').value = c.mast != null ? c.mast : 0;
     $('ck-weight').value = c.weight || '';
     $('ck-rpe').value = c.rpe || '';
+    $('ck-duration').value = c.duration || '';
     $('ck-note').value = c.note || '';
   }
   function readCheckinForm() {
@@ -679,7 +764,9 @@
       training: $('ck-training').checked, pelvic: $('ck-pelvic').checked, sleep: $('ck-sleep').checked,
       alcohol: $('ck-alcohol').checked, morning: $('ck-morning').checked,
       mast: Math.max(0, parseInt($('ck-mast').value, 10) || 0),
-      weight: $('ck-weight').value.trim(), rpe: $('ck-rpe').value.trim(), note: $('ck-note').value.trim()
+      weight: $('ck-weight').value.trim(), rpe: $('ck-rpe').value.trim(),
+      duration: Math.max(0, parseInt($('ck-duration').value, 10) || 0),
+      note: $('ck-note').value.trim()
     };
   }
   async function onSaveCheckin() {
@@ -715,6 +802,17 @@
     });
     $('weekStats').innerHTML = '<div class="kv"><b>训练完成：</b><span class="val">' + training + ' / 5 次</span></div><div class="kv"><b>睡眠达标：</b><span class="val">' + sleep + ' 天</span></div><div class="kv"><b>晨勃：</b><span class="val">' + morning + ' 天</span></div><div class="kv"><b>手淫次数：</b><span class="val">' + mast + ' / 上限 ' + PLAN.sexWeeklyLimit + '</span></div><div class="kv"><b>平均RPE：</b><span class="val">' + (rpeN ? (rpeSum / rpeN).toFixed(1) : '—') + '</span></div>';
 
+    // 训练负荷
+    const wlm = weeklyLoadMetrics(currentDate);
+    const ac = acwr(currentDate);
+    const ml = monthLoad(currentDate);
+    $('loadStats').innerHTML =
+      '<div class="kv"><b>本周负荷：</b><span class="val">' + wlm.load + ' AU（' + wlm.n + ' 次训练）</span></div>' +
+      '<div class="kv"><b>本周单调性：</b><span class="val">' + (wlm.monotony || '—') + '（>2.0 伤病风险升高）</span></div>' +
+      '<div class="kv"><b>本周应变：</b><span class="val">' + wlm.strain + '</span></div>' +
+      '<div class="kv"><b>本月负荷：</b><span class="val">' + ml + ' AU</span></div>' +
+      '<div class="kv"><b>ACWR：</b><span class="val">' + (ac ? ac.value + '（急性' + ac.acute + ' / 慢性' + ac.chronic + '）' : '数据积累中（需满28天）') + '</span></div>';
+
     const mk = currentDate.slice(0, 7);
     let md = 0, mt = 0, ms = 0, mm = 0, mma = 0;
     Object.keys(checkins).forEach(function (date) {
@@ -733,6 +831,71 @@
       const diff = weights[weights.length - 1].w - weights[0].w;
       $('weightTrend').innerHTML = '<div class="kv"><b>最新：</b><span class="val">' + last.w + ' kg（' + last.date + '）</span></div><div class="kv"><b>记录：</b><span class="val">' + weights.map(function (x) { return x.date.slice(5) + ':' + x.w; }).join('　') + '</span></div><div class="kv"><b>趋势：</b><span class="val">' + (diff >= 0 ? '▲ +' : '▼ ') + diff.toFixed(1) + ' kg（首末）</span></div>';
     } else $('weightTrend').innerHTML = '<div class="empty">暂无体重记录</div>';
+  }
+
+  // ---------- 训练负荷（Foster sRPE + 单调性/应变 + ACWR） ----------
+  function parsePlanMin(str) {
+    if (!str) return null;
+    const m = String(str).match(/(\d+)\s*[-~]\s*(\d+)/);
+    if (m) return (Number(m[1]) + Number(m[2])) / 2;
+    const s = String(str).match(/(\d+)/);
+    return s ? Number(s[1]) : null;
+  }
+  // 单日负荷：打卡RPE(6-20 映射到0-10 CR10) × 时长；未填时长退回计划时长
+  function dayLoad(date) {
+    const c = checkins[date];
+    if (!c || !c.training || !c.rpe) return 0;
+    const rpe = Number(c.rpe);
+    const cr10 = Math.max(0, Math.min(10, (rpe - 6) / 14 * 10));
+    let dur = Number(c.duration) || 0;
+    if (!dur) {
+      const d = allDays.find(function (x) { return x.date === date; });
+      dur = parsePlanMin(d ? d.duration : '') || 0;
+    }
+    return Math.round(cr10 * dur * 10) / 10;
+  }
+  function sumRange(from, to) {
+    let s = 0;
+    for (let d = from; d <= to; d = addDays(d, 1)) s += dayLoad(d);
+    return s;
+  }
+  function meanStd(arr) {
+    const vals = arr.filter(function (v) { return v > 0; });
+    if (!vals.length) return { mean: 0, sd: 0, n: 0 };
+    const mean = vals.reduce(function (a, v) { return a + v; }, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce(function (a, v) { return a + (v - mean) * (v - mean); }, 0) / vals.length);
+    return { mean: mean, sd: sd, n: vals.length };
+  }
+  function weeklyLoadMetrics(date) {
+    // 本周一
+    const d = parseDate(date);
+    const dow = (d.getDay() + 6) % 7; // 周一=0
+    const monday = addDays(date, -dow);
+    const load = sumRange(monday, addDays(monday, 6));
+    const arr = [];
+    for (let i = 0; i < 7; i++) arr.push(dayLoad(addDays(monday, i)));
+    const ms = meanStd(arr);
+    const monotony = ms.sd > 0 ? Math.round(ms.mean / ms.sd * 100) / 100 : 0;
+    const strain = Math.round(load * monotony * 100) / 100;
+    return { monday: monday, load: Math.round(load * 10) / 10, monotony: monotony, strain: strain, n: ms.n };
+  }
+  function acwr(date) {
+    // 急性=近7天日均，慢性=近28天日均；需有≥28天历史记录才显示
+    const keys = Object.keys(checkins).filter(function (k) { return checkins[k] && checkins[k].rpe; }).sort();
+    if (!keys.length || diffDays(keys[0], date) < 27) return null;
+    const last = addDays(date, 1); // 含今天
+    const acute = sumRange(addDays(last, -7), last) / 7;
+    const chronic = sumRange(addDays(last, -28), last) / 28;
+    if (chronic <= 0) return null;
+    return { value: Math.round(acute / chronic * 100) / 100, acute: Math.round(acute * 10) / 10, chronic: Math.round(chronic * 10) / 10 };
+  }
+  function monthLoad(date) {
+    const mk = date.slice(0, 7);
+    let s = 0;
+    Object.keys(checkins).forEach(function (d) {
+      if (d.startsWith(mk)) s += dayLoad(d);
+    });
+    return Math.round(s * 10) / 10;
   }
 
   // ---------- 成绩 ----------
@@ -806,7 +969,8 @@
     let html = '<ul class="exercise-list">';
     list.forEach(function (id) {
       const e = exercises[id];
-      html += '<li><span class="exercise-name" style="color:' + esc(e.color || '#ffb84d') + '">' + esc(e.name) + '</span><span class="exercise-detail">' + esc(e.cat) + ' · ' + esc(e.detail || '') + ' <button class="btn mini" data-edit="' + esc(id) + '">改</button> <button class="btn mini danger" data-del="' + esc(id) + '">删</button></span></li>';
+      const a = window.PLAN_ANNOTATE ? window.PLAN_ANNOTATE(e) : e;
+      html += '<li><span class="exercise-name" style="color:' + esc(e.color || '#ffb84d') + '">' + esc(e.name) + exBadges(a) + '</span><span class="exercise-detail">' + esc(e.cat) + ' · ' + esc(e.detail || '') + ' <button class="btn mini" data-edit="' + esc(id) + '">改</button> <button class="btn mini danger" data-del="' + esc(id) + '">删</button></span></li>';
     });
     html += '</ul>';
     box.innerHTML = html;
@@ -814,6 +978,9 @@
       b.addEventListener('click', function () {
         const e = exercises[b.getAttribute('data-edit')];
         $('ex-name').value = e.name; $('ex-cat').value = e.cat || '自定义'; $('ex-detail').value = e.detail || ''; $('ex-color').value = e.color || '#ffb84d'; $('ex-note').value = e.note || '';
+        const ea = window.PLAN_ANNOTATE ? window.PLAN_ANNOTATE(e) : e;
+        $('ex-intensity').value = e.intensity || ea.intensity || '';
+        $('ex-focus').value = e.focus || ea.focus || '';
         $('exMsg').textContent = '正在编辑：' + e.name;
       });
     });
@@ -832,7 +999,9 @@
     const msg = $('exMsg');
     if (!name) { msg.textContent = '名称不能为空'; msg.className = 'form-msg err'; return; }
     const id = 'ex_' + Date.now();
-    const data = { name: name, cat: $('ex-cat').value, detail: $('ex-detail').value.trim(), color: $('ex-color').value, note: $('ex-note').value.trim() };
+    const raw = { name: name, cat: $('ex-cat').value, detail: $('ex-detail').value.trim(), color: $('ex-color').value, note: $('ex-note').value.trim(), intensity: $('ex-intensity').value, focus: $('ex-focus').value };
+    const a = window.PLAN_ANNOTATE ? window.PLAN_ANNOTATE(raw) : raw;
+    const data = { name: name, cat: raw.cat, detail: raw.detail, color: raw.color, note: raw.note, intensity: raw.intensity || a.intensity, focus: raw.focus || a.focus };
     exercises[id] = data;
     await saveExercise(id, data);
     $('ex-name').value = ''; $('ex-detail').value = ''; $('ex-note').value = '';

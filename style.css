@@ -195,3 +195,19 @@ input[type="time"], input[type="date"] { background: var(--card2); color: var(--
   flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text);
   border-radius: 8px; padding: 7px 8px; font-size: 13px; min-width: 0;
 }
+
+
+/* 侧重点标签 + 强度徽章 */
+.ex-focus {
+  display: inline-block; font-size: 11px; font-weight: 700; margin-left: 6px;
+  padding: 1px 6px; border-radius: 99px; background: rgba(255,255,255,.08); vertical-align: 2px;
+}
+.ex-int {
+  display: inline-block; font-size: 11px; font-weight: 700; margin-left: 4px;
+  padding: 1px 6px; border-radius: 99px; vertical-align: 2px;
+}
+.int-low { color: #81c784; background: rgba(129,199,132,.15); }
+.int-med { color: #ffd54f; background: rgba(255,213,79,.15); }
+.int-high { color: #ff8a65; background: rgba(255,138,101,.18); }
+.int-peak { color: #ff5252; background: rgba(255,82,82,.2); }
+.exercise-name { display: flex; align-items: center; flex-wrap: wrap; }

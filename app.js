@@ -11,9 +11,31 @@
   function qs(name) { return new URLSearchParams(location.search).get(name); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function $(id) { return document.getElementById(id); }
+  // 结构化的练习项 -> 展示文本
+  function fmtEx(m) {
+    if (!m) return '';
+    if (m.detail) return m.detail;
+    const parts = [];
+    if (m.sets != null && m.reps != null) parts.push(m.sets + '×' + m.reps);
+    else if (m.sets != null) parts.push(m.sets + '组');
+    else if (m.reps != null) parts.push(m.reps);
+    if (m.pace) parts.push(m.pace);
+    if (m.distance) parts.push(m.distance);
+    if (m.rest) parts.push(/^(组间|休)/.test(m.rest) ? m.rest : '组间' + m.rest);
+    if (m.note) parts.push(m.note);
+    return parts.join(' · ');
+  }
+  // 在结构化练习项上追加说明（不破坏 detail）
+  function withSuffix(m, suffix) {
+    const mm = Object.assign({}, m);
+    if (mm.detail) mm.detail += suffix;
+    else mm.note = (mm.note ? mm.note + '；' : '') + suffix;
+    return mm;
+  }
 
   const PLAN = window.PLAN;
   if (!PLAN) { document.body.innerHTML = '<p style="padding:20px">plan-data.js 加载失败</p>'; return; }
+  const OVERRIDES = window.COACH_OVERRIDES || {};
 
   // ---------- 状态 ----------
   const dateOverride = qs('date');
@@ -24,10 +46,15 @@
   const dayIdx = (daysSinceStart % 7) + 1;
   let allDays = [];
   PLAN.weeks.forEach(function (w) { w.days.forEach(function (d) { allDays.push(d); }); });
-  const todayPlan = allDays.find(function (d) { return d.date === currentDate; });
+  function resolvePlan(date) {
+    const base = allDays.find(function (d) { return d.date === date; });
+    const ov = OVERRIDES[date];
+    return ov ? Object.assign({}, base, ov, { date: date }) : base;
+  }
+  const todayPlan = resolvePlan(currentDate);
   const weekPlan = PLAN.weeks[weekIdx - 1] || null;
 
-  let checkins = {}, sleeps = {}, tests = {}, exercises = {}, dayItems = {}, coros = null, settings = {};
+  let checkins = {}, sleeps = {}, tests = {}, exercises = {}, dayItems = {}, weathers = {}, execs = {}, coros = null, settings = {};
   let privKey = null;
 
   // ---------- 加密辅助 ----------
@@ -43,6 +70,8 @@
   async function saveExercise(id, data) { await API.save('exercise', id, data); }
   async function removeExercise(id) { await API.remove('exercise', id); }
   async function saveDayItems(date, arr) { await API.save('dayItem', date, arr); }
+  async function saveWeather(date, data) { await API.save('weather', date, data); }
+  async function saveExec(date, data) { await API.save('exec', date, data); }
   async function saveCoros(snap) { await API.saveCoros(snap); }
 
   // ---------- 登录 / 启动 ----------
@@ -89,6 +118,8 @@
     tests = d.tests || {};
     exercises = d.exercises || {};
     dayItems = d.dayItems || {};
+    weathers = d.weather || {};
+    execs = d.exec || {};
     coros = d.coros || null;
     settings = d.settings || {};
     if (privKey) {
@@ -104,8 +135,10 @@
     updateSleepBanner();
     switchTab(sleeps[currentDate] ? 'today' : 'sleep');
     renderToday();
+    renderWeatherForm();
     renderNextPreview();
     fillCheckinForm();
+    renderExecForm();
     renderWeekCheckins();
     renderSleepForm();
     renderSleepAutoEval();
@@ -249,8 +282,8 @@
     const d = parseDate(currentDate);
     const dow = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
     $('dateLine').textContent = currentDate + ' 周' + dow;
-    if (daysSinceStart < 0) { $('weekLine').textContent = '计划尚未开始（2026-08-22 起算）'; $('phaseLine').textContent = ''; }
-    else if (weekIdx > PLAN.totalWeeks) { $('weekLine').textContent = '24周计划已完成，进入长期耐力周期'; $('phaseLine').textContent = ''; }
+    if (daysSinceStart < 0) { $('weekLine').textContent = '计划尚未开始（' + PLAN.programStart + ' 起算）'; $('phaseLine').textContent = ''; }
+    else if (weekIdx > PLAN.totalWeeks) { $('weekLine').textContent = PLAN.totalWeeks + '周计划已完成'; $('phaseLine').textContent = ''; }
     else { $('weekLine').textContent = '第 ' + weekIdx + ' / ' + PLAN.totalWeeks + ' 周 · 第 ' + dayIdx + ' 天'; $('phaseLine').textContent = '阶段：' + (weekPlan ? weekPlan.phase : ''); }
   }
 
@@ -299,37 +332,77 @@
     else { level = 'full'; label = '恢复良好'; }
     return { level: level, label: label, auto: autoScore, personal: personal, combined: combined };
   }
-  function adjustedDay(plan, status) {
-    if (!plan || status.level === 'none' || status.level === 'full') return plan;
+  function adjustedDay(plan, status, wx) {
+    if (!plan) return plan;
     const low = status.level === 'low';
+    const light = status.level === 'light';
     const copy = JSON.parse(JSON.stringify(plan));
     if (low) {
       if (copy.type === 'speed' || copy.type === 'speedEnd') { copy.title = '恢复不足 · 改为轻松有氧'; copy.main = [{ name: 'Zone2慢跑', detail: '30-40min，心率120-130，不冲刺、不跳深' }]; copy.note = '睡眠不足：自动降级为轻松有氧'; }
       else if (copy.type === 'lower') { copy.title = '恢复不足 · 下肢轻力量'; copy.main = [{ name: '杠铃深蹲', detail: '3×5 @70%计划重量' }, { name: '相扑硬拉', detail: '2×5 @70%' }, { name: '保加利亚分腿蹲', detail: '2×8每侧 轻' }]; copy.note = '睡眠不足：减量减重，不做跳深/大重量'; }
-      else if (copy.type === 'upper') { copy.title = '恢复不足 · 上肢轻量'; copy.main = copy.main.slice(0, 4).map(function (m) { return { name: m.name, detail: m.detail + '（减量30%）' }; }); copy.note = '睡眠不足：组数/重量减30%'; }
+      else if (copy.type === 'upper') { copy.title = '恢复不足 · 上肢轻量'; copy.main = copy.main.slice(0, 4).map(function (m) { return withSuffix(m, '（减量30%）'); }); copy.note = '睡眠不足：组数/重量减30%'; }
       else if (copy.type === 'aerobic' || copy.type === 'longAerobic') { copy.main = [{ name: 'Zone2慢跑', detail: '30min，心率120-130' }]; copy.note = '睡眠不足：缩短时长、降低心率'; }
       else if (copy.type === 'test') { copy.note = (copy.note ? copy.note + ' | ' : '') + '睡眠不足：建议推迟测试'; }
-    } else {
+    } else if (light) {
       copy.note = (copy.note ? copy.note + ' | ' : '') + '轻度疲劳：总量减20-30%、取消最大冲刺/跳深、重量降一档';
-      if (copy.type === 'speed' || copy.type === 'speedEnd') copy.main = copy.main.filter(function (m) { return !/跳深|跳箱/.test(m.name); }).map(function (m) { return { name: m.name, detail: m.detail + '（强度降一档）' }; });
-      if (copy.type === 'lower' || copy.type === 'upper') copy.main = copy.main.map(function (m) { return { name: m.name, detail: m.detail + '（重量-10~15%）' }; });
+      if (copy.type === 'speed' || copy.type === 'speedEnd') copy.main = copy.main.filter(function (m) { return !/跳深|跳箱/.test(m.name); }).map(function (m) { return withSuffix(m, '（强度降一档）'); });
+      if (copy.type === 'lower' || copy.type === 'upper') copy.main = copy.main.map(function (m) { return withSuffix(m, '（重量-10~15%）'); });
+    }
+    // 天气自动调整
+    if (wx && wx.reasons && wx.reasons.length) {
+      const run = copy.type === 'speed' || copy.type === 'speedEnd' || copy.type === 'aerobic' || copy.type === 'longAerobic' || copy.type === 'test';
+      const str = copy.type === 'lower' || copy.type === 'upper' || copy.type === 'jump';
+      if (wx.hot && run) {
+        copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：配速降5-8%、组间补水、心率上限-10bpm';
+        copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温降速/补水）'); });
+      } else if (wx.hot && str) {
+        copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：组数减1组、组间补水';
+        copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温减量）'); });
+      }
+      if (wx.windy && run) {
+        copy.note = (copy.note ? copy.note + ' | ' : '') + '大风≥5级：配速放缓、缩短冲刺距离/组数';
+        copy.main = copy.main.map(function (m) { return withSuffix(m, '（大风放缓）'); });
+      }
+      if (wx.sun && (run || str)) {
+        copy.note = (copy.note ? copy.note + ' | ' : '') + '强日照：避开直晒时段、多补水、强度降10%';
+      }
+      copy.weatherNote = wx.reasons.join('；');
     }
     return copy;
+  }
+  function weatherStatus() {
+    const w = weathers[currentDate];
+    if (!w || (!w.temp && !w.wind && !w.sun)) return { level: 'none', label: '未填天气', reasons: [] };
+    const reasons = [];
+    const hot = Number(w.temp) >= 30;
+    const windy = Number(w.wind) >= 5;
+    const sun = w.sun === 'strong';
+    if (hot) reasons.push('高温' + w.temp + '°C');
+    if (windy) reasons.push('风力' + w.wind + '级');
+    if (sun) reasons.push('强日照');
+    return { level: reasons.length ? 'adjusted' : 'none', label: reasons.length ? '已按天气调整' : '天气正常', reasons: reasons, hot: hot, windy: windy, sun: sun };
   }
   // ---------- 今日 ----------
   function renderToday() {
     if (!todayPlan) { $('todayBody').innerHTML = '<div class="empty">计划未开始</div>'; return; }
     const st = sleepStatus();
-    const p = adjustedDay(todayPlan, st);
+    const wx = weatherStatus();
+    const p = adjustedDay(todayPlan, st, wx);
     const badge = p.type === 'rest' ? '<span class="badge rest">休息</span>' : p.type === 'test' ? '<span class="badge test">测试</span>' : '<span class="badge">训练</span>';
     let html = '<div class="card-title">' + esc(p.title) + badge + '</div>';
-    html += '<div class="kv"><b>今日状态：</b><span class="val">' + esc(st.label) + (st.level === 'low' || st.level === 'light' ? ' · 计划已自动调整' : '') + '</span></div>';
-    if (st.level !== 'none') html += '<div class="kv"><b>评测：</b><span class="val">自动 ' + (st.auto != null ? st.auto : '—') + ' · 个人 ' + (st.personal || '—') + ' · 综合 ' + (st.combined != null ? st.combined : '—') + '</span></div>';
+    const adjBits = [];
+    if (st.level === 'low' || st.level === 'light') adjBits.push('睡眠' + st.label);
+    if (wx.level === 'adjusted') adjBits.push('天气（' + wx.reasons.join('、') + '）');
+    html += '<div class="kv"><b>今日状态：</b><span class="val">' + esc(st.label) + (adjBits.length ? ' · 已自动调整：' + esc(adjBits.join(' + ')) : '') + '</span></div>';
+    if (st.level !== 'none') html += '<div class="kv"><b>睡眠评测：</b><span class="val">自动 ' + (st.auto != null ? st.auto : '—') + ' · 个人 ' + (st.personal || '—') + ' · 综合 ' + (st.combined != null ? st.combined : '—') + '</span></div>';
+    if (wx.level === 'adjusted') html += '<div class="kv"><b>天气：</b><span class="val">' + esc(wx.reasons.join(' · ')) + '</span></div>';
     html += '<div class="venue">' + esc(p.venue) + ' · ' + esc(p.duration) + ' · ' + esc(p.phase) + '</div>';
     if (p.warmup) html += '<div class="kv"><b>热身：</b><span class="val">' + esc(p.warmup) + '</span></div>';
     if (p.main && p.main.length) {
       html += '<ul class="exercise-list">';
-      p.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(m.detail) + '</span></li>'; });
+      p.main.forEach(function (m) {
+        html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>';
+      });
       html += '</ul>';
     }
     if (p.note) html += '<div class="note">💡 ' + esc(p.note) + '</div>';
@@ -348,7 +421,7 @@
     (p.foods || []).forEach(function (f) { fhtml += '<div class="kv"><b>' + esc(f.when) + '：</b><span class="val">' + esc(f.items) + '</span></div>'; });
     $('foodBody').innerHTML = fhtml || '<div class="empty">无</div>';
 
-    const rules = ['酒精=0（含药酒）', '手淫每周≤' + PLAN.sexWeeklyLimit + '次，训练日/测试前48h禁止', '睡眠 23:00-07:00，午休≤20min', '体重 67-70kg，蛋白质110-135g/天', '膝/腰疼痛立即降档'];
+    const rules = ['酒精=0（含药酒）', '手淫每周≤' + PLAN.sexWeeklyLimit + '次，训练日/测试前48h禁止', '睡眠 23:00-07:00，午休≤20min，晨勃=每日恢复指标', '体重目标 64-65kg，蛋白质130-140g/天', '膝/踝/跟腱/腘绳肌疼痛立即降档或停', '静息心率较基线升5-8次/分 → 减量'];
     $('ruleBody').innerHTML = rules.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
 
     renderDayCustom();
@@ -396,17 +469,101 @@
     });
   }
 
+  // ---------- 天气（今日页） ----------
+  function renderWeatherForm() {
+    const box = $('weatherForm');
+    if (!box) return;
+    const w = weathers[currentDate] || {};
+    const sunSel = ['', '阴天', '多云', '晴', '强日照'];
+    let html = '<div class="form-grid">';
+    html += '<label class="field-label">温度（°C）<input type="number" id="wx-temp" min="-20" max="50" value="' + esc(w.temp != null ? w.temp : '') + '" placeholder="如 32"></label>';
+    html += '<label class="field-label">日照<select id="wx-sun"><option value="">未选</option>' + sunSel.map(function (s) { return '<option value="' + esc(s) + '"' + (w.sun === s ? ' selected' : '') + '>' + esc(s || '未选') + '</option>'; }).join('') + '</select></label>';
+    html += '<label class="field-label">风力（级）<select id="wx-wind"><option value="">未选</option>' + [1, 2, 3, 4, 5, 6].map(function (v) { return '<option value="' + v + '"' + (Number(w.wind) === v ? ' selected' : '') + '>' + v + ' 级</option>'; }).join('') + '</select></label>';
+    html += '<button class="btn primary" id="btn-save-weather">保存天气并调整今日计划</button><span class="form-msg" id="weatherMsg"></span>';
+    html += '</div>';
+    box.innerHTML = html;
+  }
+  function readWeatherForm() {
+    return {
+      temp: $('wx-temp') ? Number($('wx-temp').value) : null,
+      sun: $('wx-sun') ? $('wx-sun').value : '',
+      wind: $('wx-wind') ? Number($('wx-wind').value) : null
+    };
+  }
+  async function onSaveWeather() {
+    const msg = $('weatherMsg');
+    if (!msg) return;
+    const w = readWeatherForm();
+    weathers[currentDate] = w;
+    try {
+      await saveWeather(currentDate, w);
+      msg.textContent = '✔ 已保存' + (API.isCloud() ? '并同步云端' : '（本机）');
+      msg.className = 'form-msg';
+    } catch (e) { msg.textContent = '保存失败：' + e.message; msg.className = 'form-msg err'; }
+    renderToday();
+  }
+
+  // ---------- 执行打卡（打卡页：今日项目勾选 + 实际配速/心率） ----------
+  function renderExecForm() {
+    const box = $('execForm');
+    if (!box) return;
+    if (!todayPlan || !todayPlan.main || !todayPlan.main.length) {
+      box.innerHTML = '<div class="empty">今日无训练项目（休息日）</div>';
+      return;
+    }
+    const st = sleepStatus();
+    const wx = weatherStatus();
+    const p = adjustedDay(todayPlan, st, wx);
+    const saved = execs[currentDate] || { items: [] };
+    const map = {};
+    saved.items.forEach(function (it, i) { map[it.name] = i; });
+    let html = '<div class="sub" style="margin-bottom:8px">按「今日」展示的项目勾选完成情况，并填实际配速/心率：</div><div class="form-grid">';
+    p.main.forEach(function (m) {
+      const idx = map[m.name];
+      const it = idx != null ? saved.items[idx] : {};
+      html += '<div class="exec-row">' +
+        '<label class="check-item" style="flex:0 0 auto;background:transparent;padding:4px 6px"><input type="checkbox" data-exec-name="' + esc(m.name) + '"' + (it.done ? ' checked' : '') + '> 完成</label>' +
+        '<div class="exec-meta"><b>' + esc(m.name) + '</b><span class="muted">' + esc(fmtEx(m)) + '</span></div>' +
+        '<div class="exec-inputs"><input type="text" data-exec-pace="' + esc(m.name) + '" placeholder="实际配速/成绩" value="' + esc(it.pace || '') + '">' +
+        '<input type="text" data-exec-hr="' + esc(m.name) + '" placeholder="心率" value="' + esc(it.hr || '') + '"></div>' +
+        '</div>';
+    });
+    html += '<button class="btn primary" id="btn-save-exec">保存执行记录</button><span class="form-msg" id="execMsg"></span></div>';
+    box.innerHTML = html;
+  }
+  function readExecForm() {
+    const items = [];
+    const boxes = document.querySelectorAll('#execForm input[data-exec-name]');
+    boxes.forEach(function (cb) {
+      const name = cb.getAttribute('data-exec-name');
+      const paceInp = document.querySelector('#execForm input[data-exec-pace="' + name.replace(/"/g, '&quot;') + '"]');
+      const hrInp = document.querySelector('#execForm input[data-exec-hr="' + name.replace(/"/g, '&quot;') + '"]');
+      items.push({ name: name, done: cb.checked, pace: paceInp ? paceInp.value.trim() : '', hr: hrInp ? hrInp.value.trim() : '' });
+    });
+    return { items: items };
+  }
+  async function onSaveExec() {
+    const msg = $('execMsg');
+    if (!msg) return;
+    execs[currentDate] = readExecForm();
+    try {
+      await saveExec(currentDate, execs[currentDate]);
+      msg.textContent = '✔ 已保存' + (API.isCloud() ? '并同步云端' : '（本机）');
+      msg.className = 'form-msg';
+    } catch (e) { msg.textContent = '保存失败：' + e.message; msg.className = 'form-msg err'; }
+  }
+
   function renderNextPreview() {
     const card = $('nextCard');
     if (!card) return;
     const show = qs('next') === '1' || new Date().getHours() >= 18;
-    const next = allDays.find(function (d) { return d.date === addDays(currentDate, 1); });
+    const next = resolvePlan(addDays(currentDate, 1));
     if (!show || !next) { card.style.display = 'none'; return; }
     card.style.display = '';
     let html = '<div class="kv"><b>' + esc(next.title) + '</b><span class="val"> ' + esc(next.venue) + ' · ' + esc(next.duration) + '</span></div>';
     if (next.main && next.main.length) {
       html += '<ul class="exercise-list">';
-      next.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(m.detail) + '</span></li>'; });
+      next.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>'; });
       html += '</ul>';
     }
     const sex = next.sex || {};
@@ -579,7 +736,7 @@
   }
 
   // ---------- 成绩 ----------
-  const TEST_POINTS = ['基线', '第8周', '第16周', '第24周'];
+  const TEST_POINTS = ['基线', '第6周', '第12周'];
   const TEST_FIELDS = [
     { key: 'run100', label: '100m (s)' }, { key: 'run400', label: '400m (s)' }, { key: 'cmj', label: 'CMJ纵跳 (cm)' },
     { key: 'approach', label: '助跑摸高 (cm)' }, { key: 'longJump', label: '立定跳远 (cm)' }, { key: 'squat', label: '深蹲 (kg)' }, { key: 'deadlift', label: '相扑硬拉 (kg)' }
@@ -617,11 +774,12 @@
   }
   function renderTestProgress() {
     const rows = [
-      { key: 'run100', label: '100m', base: 13.5, target: 12.3, lower: true },
-      { key: 'run400', label: '400m', base: 70, target: 60, lower: true },
-      { key: 'cmj', label: 'CMJ纵跳', base: 0, target: 40, lower: false },
-      { key: 'longJump', label: '立定跳远', base: 0, target: 300, lower: false },
-      { key: 'squat', label: '深蹲', base: 80, target: 115, lower: false }
+      { key: 'run100', label: '100m', base: 12.8, target: 12.2, lower: true },
+      { key: 'run400', label: '400m', base: 60, target: 56, lower: true },
+      { key: 'approach', label: '助跑摸高', base: 295, target: 308, lower: false },
+      { key: 'longJump', label: '立定跳远', base: 270, target: 290, lower: false },
+      { key: 'squat', label: '深蹲', base: 105, target: 120, lower: false },
+      { key: 'deadlift', label: '相扑硬拉', base: 130, target: 150, lower: false }
     ];
     let html = '';
     rows.forEach(function (r) {
@@ -703,7 +861,7 @@
     });
     $('btn-clear-cloud').addEventListener('click', function () { API.clearCloudCfg(); });
     $('btn-export').addEventListener('click', function () {
-      const blob = new Blob([JSON.stringify({ checkins: checkins, sleep: sleeps, tests: tests, exercises: exercises, dayItems: dayItems, coros: coros, settings: settings }, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ checkins: checkins, sleep: sleeps, tests: tests, exercises: exercises, dayItems: dayItems, weather: weathers, exec: execs, coros: coros, settings: settings }, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = '训练助手备份-' + todayStr() + '.json';
@@ -718,13 +876,15 @@
       reader.onload = async function () {
         try {
           const d = JSON.parse(reader.result);
-          checkins = d.checkins || {}; sleeps = d.sleep || {}; tests = d.tests || {}; exercises = d.exercises || {}; dayItems = d.dayItems || {}; coros = d.coros || null;
+          checkins = d.checkins || {}; sleeps = d.sleep || {}; tests = d.tests || {}; exercises = d.exercises || {}; dayItems = d.dayItems || {}; weathers = d.weather || {}; execs = d.exec || {}; coros = d.coros || null;
           if (d.settings && d.settings.privacy) settings = Object.assign(settings, { privacy: d.settings.privacy });
           for (const k of Object.keys(checkins)) await saveCheckinByDate(k, checkins[k]);
           for (const k of Object.keys(sleeps)) await saveSleep(k, sleeps[k]);
           await saveTests();
           for (const k of Object.keys(exercises)) await saveExercise(k, exercises[k]);
           for (const k of Object.keys(dayItems)) await saveDayItems(k, dayItems[k]);
+          for (const k of Object.keys(weathers)) await saveWeather(k, weathers[k]);
+          for (const k of Object.keys(execs)) await saveExec(k, execs[k]);
           if (coros) await saveCoros(coros);
           if (settings.reminders) await API.saveSetting('reminders', settings.reminders);
           $('backupMsg').textContent = '✔ 导入完成，请刷新';
@@ -857,6 +1017,8 @@
     $('btn-save-tests').addEventListener('click', onSaveTests);
     $('btn-save-sleep').addEventListener('click', onSaveSleep);
     $('btn-save-ex').addEventListener('click', onSaveExercise);
+    const bsw = $('btn-save-weather'); if (bsw) bsw.addEventListener('click', onSaveWeather);
+    const bse = $('btn-save-exec'); if (bse) bse.addEventListener('click', onSaveExec);
     bindSettings();
     bindReminders();
     bindAuth();

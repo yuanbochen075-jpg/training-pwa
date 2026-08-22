@@ -172,6 +172,8 @@
           tests: d.test || {},
           exercises: d.exercise || {},
           dayItems: d.dayItem || {},
+          weather: d.weather || {},
+          exec: d.exec || {},
           coros: d.coros ? d.coros['latest'] : null,
           settings: d.setting || {},
           pushSub: d.pushSub ? d.pushSub['latest'] : null
@@ -184,6 +186,8 @@
         tests: d.test || {},
         exercises: d.exercise || {},
         dayItems: d.dayItem || {},
+        weather: d.weather || {},
+        exec: d.exec || {},
         coros: d.coros ? d.coros['latest'] : null,
         settings: d.setting || {},
         pushSub: d.pushSub ? d.pushSub['latest'] : null

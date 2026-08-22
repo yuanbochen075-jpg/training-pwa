@@ -94,6 +94,7 @@
     <!-- 今日 -->
     <section id="tab-today" class="tab-panel">
       <div class="card status-card" id="todayCard"><div class="card-title">今日安排</div><div id="todayBody">加载中…</div></div>
+      <div class="card"><div class="card-title">🌤 今日天气（训练前填写，自动结合睡眠调整强度）</div><div id="weatherForm">—</div></div>
       <div class="card" id="nextCard" style="display:none"><div class="card-title">🌙 明日预告（每天18:00后可见）</div><div id="nextBody"></div></div>
       <div class="card"><div class="card-title">😴 睡眠目标</div><div id="sleepBody">—</div></div>
       <div class="card"><div class="card-title" id="sexTitle">手淫规则</div><div id="sexBody">—</div></div>
@@ -104,6 +105,10 @@
 
     <!-- 打卡 -->
     <section id="tab-checkin" class="tab-panel">
+      <div class="card">
+        <div class="card-title">🏃 今日训练执行（勾选完成 + 填实际配速/心率）</div>
+        <div id="execForm">—</div>
+      </div>
       <div class="card">
         <div class="card-title">✅ 今日打卡</div>
         <div class="form-grid" id="checkinForm">
@@ -133,7 +138,7 @@
     <!-- 成绩 -->
     <section id="tab-tests" class="tab-panel">
       <div class="card">
-        <div class="card-title">🎯 测试成绩（基线/第8/16/24周）</div>
+        <div class="card-title">🎯 测试成绩（基线/第6/12周）</div>
         <div class="test-form" id="testForm"></div>
         <button class="btn primary" id="btn-save-tests">保存成绩</button>
         <span class="form-msg" id="testMsg"></span>
@@ -213,7 +218,7 @@
   </main>
 
   <footer class="app-footer">
-    <div>计划起算：2026-08-22（周六） · 24周</div>
+    <div>计划起算：2026-08-24（周一） · 12周冲刺计划</div>
     <div id="serverHint">本地模式 · 数据保存在本机浏览器</div>
   </footer>
 

@@ -180,3 +180,18 @@ select {
 input[type="color"] { width: 48px; height: 38px; padding: 2px; background: var(--card2); border: 1px solid var(--border); border-radius: 8px; }
 input[type="time"], input[type="date"] { background: var(--card2); color: var(--text); border: 1px solid var(--border); border-radius: 9px; padding: 9px; font-size: 14px; width: 100%; }
 .kv .btn { display: inline-block; margin-left: 6px; }
+
+
+/* 天气表单 + 执行打卡 */
+.exec-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--card2); border-radius: 10px; padding: 8px 10px;
+}
+.exec-meta { flex: 1 1 120px; min-width: 0; }
+.exec-meta b { display: block; font-size: 13.5px; }
+.exec-meta .muted { color: var(--muted); font-size: 12px; display: block; }
+.exec-inputs { display: flex; gap: 6px; flex: 1 1 100%; }
+.exec-inputs input {
+  flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px 8px; font-size: 13px; min-width: 0;
+}

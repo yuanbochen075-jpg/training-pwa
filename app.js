@@ -52,6 +52,7 @@
   async function boot() {
     setupTabs();
     renderHeader();
+    bindAuth();
     if (API.isCloud() && !API.session()) {
       showOverlay('loginOverlay');
       $('loginHint').textContent = '云端模式：登录你的账号（没有就先注册）';
@@ -105,7 +106,10 @@
     registerSW();
   }
   // ---------- 登录 ----------
+  let authBound = false;
   function bindAuth() {
+    if (authBound) return;
+    authBound = true;
     $('btnLogin').addEventListener('click', async function () {
       const msg = $('loginMsg');
       try {
@@ -124,7 +128,7 @@
           hideOverlay('loginOverlay');
           await boot();
         } else {
-          msg.className = 'form-msg'; msg.textContent = '注册成功，请去邮箱确认后再登录';
+          msg.style.color = '#4ade80'; msg.className = 'form-msg'; msg.textContent = '✔ 注册成功！确认邮件已发送到 ' + $('loginEmail').value.trim() + '，去邮箱点确认链接后回来登录';
         }
       } catch (e) { msg.className = 'form-msg err'; msg.textContent = '注册失败：' + e.message; }
     });
@@ -824,3 +828,5 @@
   // ---------- 启动 ----------
   boot();
 })();
+
+

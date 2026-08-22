@@ -66,7 +66,13 @@
       return;
     }
     const needPriv = settings.privacy && !privKey;
-    if (needPriv) { privacyMode = 'unlock'; showOverlay('privacyOverlay'); return; }
+    if (needPriv) {
+      privacyMode = 'unlock';
+      var sub = document.querySelector('#privacyOverlay .modal-sub');
+      if (sub) sub.textContent = '输入隐私密码解锁（敏感数据加密存储，只在浏览器解密）';
+      showOverlay('privacyOverlay');
+      return;
+    }
     finishBoot();
   }
   function showFatal(msg) {
@@ -726,7 +732,12 @@
       };
       reader.readAsText(f);
     });
-    $('btn-set-privacy').addEventListener('click', function () { privacyMode = 'change'; showOverlay('privacyOverlay'); });
+    $('btn-set-privacy').addEventListener('click', function () {
+      privacyMode = 'change';
+      var sub = document.querySelector('#privacyOverlay .modal-sub');
+      if (sub) sub.textContent = '输入新隐私密码（会用新密码重新加密所有敏感数据）';
+      showOverlay('privacyOverlay');
+    });
     const brp = $('btn-reset-privacy');
     if (brp) brp.addEventListener('click', resetPrivacy);
     $('btn-logout').addEventListener('click', async function () {

@@ -59,7 +59,17 @@
     const s = getSession();
     if (s && s.access_token) headers['Authorization'] = 'Bearer ' + s.access_token;
     o.headers = headers;
-    const r = await fetch(c.url + path, o);
+    const ctrl = new AbortController();
+    const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+    o.signal = ctrl.signal;
+    let r;
+    try {
+      r = await fetch(c.url + path, o);
+    } catch (e) {
+      clearTimeout(timer);
+      throw new Error(e && e.name === 'AbortError' ? '请求超时，请检查网络' : (e.message || '网络错误'));
+    }
+    clearTimeout(timer);
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
       try { const j = await r.json(); msg = j.msg || j.error_description || j.message || msg; } catch (e) {}

@@ -59,10 +59,21 @@
       $('loginHint').textContent = '云端模式：登录你的账号（没有就先注册）';
       return;
     }
-    await loadAllData();
+    try {
+      await loadAllData();
+    } catch (e) {
+      showFatal(e && e.message ? e.message : String(e));
+      return;
+    }
     const needPriv = settings.privacy && !privKey;
     if (needPriv) { showOverlay('privacyOverlay'); return; }
     finishBoot();
+  }
+  function showFatal(msg) {
+    const body = $('todayBody');
+    if (body) body.innerHTML = '<div class="err-box"><b>⚠️ 加载失败：</b>' + esc(msg) + '<br><br><button class="btn primary" onclick="location.reload()">重新加载</button></div>';
+    const card = $('todayCard'); if (card) card.style.display = 'block';
+    const banner = $('sleepBanner'); if (banner) banner.style.display = 'none';
   }
 
   async function loadAllData() {
@@ -138,13 +149,42 @@
 
   // ---------- 隐私密码 ----------
   async function setPrivacy(pass) {
+    const oldKey = privKey;
     const salt = CryptoBox.newSalt();
     const key = await CryptoBox.deriveKey(pass, salt);
     const check = await CryptoBox.encryptText('OK', key);
+    if (oldKey) {
+      // 已解锁：用旧密码解密 → 新密码重新加密 → 写回云端
+      const nc = {}, ns = {};
+      for (const k of Object.keys(checkins)) nc[k] = await CryptoBox.encryptFields(await CryptoBox.decryptFields(checkins[k], oldKey), key, ['mast', 'weight', 'note']);
+      for (const k of Object.keys(sleeps)) ns[k] = await CryptoBox.encryptFields(await CryptoBox.decryptFields(sleeps[k], oldKey), key, ['deep', 'light', 'rem', 'note']);
+      for (const k of Object.keys(nc)) await API.save('checkin', k, nc[k]);
+      for (const k of Object.keys(ns)) await API.save('sleep', k, ns[k]);
+      checkins = nc; sleeps = ns;
+    }
     settings.privacy = { salt: salt, check: check };
     await API.saveSetting('privacy', settings.privacy);
     privKey = key;
     await loadAllData();
+  }
+  function hasEnc(d) {
+    if (!d || typeof d !== 'object') return false;
+    return Object.keys(d).some(function (k) { var v = d[k]; return v && typeof v === 'object' && v.enc === true; });
+  }
+  async function resetPrivacy() {
+    const msg = '⚠️ 重置隐私密码会：\n\n1. 删除当前隐私密码设置\n2. 删除所有已加密数据（睡眠分期/手淫次数/备注/晨重）\n3. 之后重新设置新密码，并从备份重新导入\n\n确定继续吗？';
+    if (!window.confirm(msg)) return;
+    try {
+      await API.remove('setting', 'privacy');
+      for (const k of Object.keys(checkins)) if (hasEnc(checkins[k])) await API.remove('checkin', k);
+      for (const k of Object.keys(sleeps)) if (hasEnc(sleeps[k])) await API.remove('sleep', k);
+      settings.privacy = null; privKey = null;
+      const m = $('privMsg'); if (m) { m.style.color = '#4ade80'; m.textContent = '✔ 已重置，请重新设置新密码'; }
+      const s = $('privacyStatus'); if (s) s.textContent = '✔ 已重置（请重新设置新密码）';
+      setTimeout(function () { location.reload(); }, 800);
+    } catch (e) {
+      window.alert('重置失败：' + e.message);
+    }
   }
   async function unlockPrivacy(pass) {
     const p = settings.privacy;
@@ -169,6 +209,8 @@
       } catch (e) { msg.className = 'form-msg err'; msg.textContent = e.message; }
     });
     $('btnSkipPriv').addEventListener('click', function () { hideOverlay('privacyOverlay'); finishBoot(); });
+    const fp = $('btnForgotPriv');
+    if (fp) fp.addEventListener('click', function () { hideOverlay('privacyOverlay'); resetPrivacy(); });
   }
 
   // ---------- 标签 ----------
@@ -683,6 +725,8 @@
       reader.readAsText(f);
     });
     $('btn-set-privacy').addEventListener('click', function () { showOverlay('privacyOverlay'); });
+    const brp = $('btn-reset-privacy');
+    if (brp) brp.addEventListener('click', resetPrivacy);
     $('btn-logout').addEventListener('click', async function () {
       await API.signOut();
       location.reload();

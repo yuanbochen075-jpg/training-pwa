@@ -1,0 +1,14 @@
+{
+  "name": "training-pwa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve .",
+    "deploy": "vercel --prod",
+    "migrate": "node supabase/migrate.mjs"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

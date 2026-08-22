@@ -1,0 +1,16 @@
+{
+  "name": "训练助手 · 跑跳冲刺",
+  "short_name": "训练助手",
+  "description": "6个月跑跳、身材、体能训练助手：睡眠优先、自动调整、自定义运动库",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

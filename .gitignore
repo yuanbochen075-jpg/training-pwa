@@ -1,0 +1,5 @@
+.vercel
+node_modules
+supabase/vapid-keys.txt
+*.local
+.DS_Store

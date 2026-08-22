@@ -53,6 +53,7 @@
     setupTabs();
     renderHeader();
     bindAuth();
+    bindPrivacy();
     if (API.isCloud() && !API.session()) {
       showOverlay('loginOverlay');
       $('loginHint').textContent = '云端模式：登录你的账号（没有就先注册）';
@@ -153,7 +154,10 @@
     privKey = key;
     await loadAllData();
   }
+  let privacyBound = false;
   function bindPrivacy() {
+    if (privacyBound) return;
+    privacyBound = true;
     $('btnUnlock').addEventListener('click', async function () {
       const msg = $('privMsg');
       try {

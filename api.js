@@ -54,13 +54,12 @@
   // ---------- Supabase REST ----------
   async function supFetch(path, opts) {
     const c = cfg();
-    const headers = {
-      'apikey': c.anon,
-      'Content-Type': 'application/json'
-    };
+    const o = Object.assign({}, opts || {});
+    const headers = Object.assign({ 'apikey': c.anon, 'Content-Type': 'application/json' }, o.headers || {});
     const s = getSession();
     if (s && s.access_token) headers['Authorization'] = 'Bearer ' + s.access_token;
-    const r = await fetch(c.url + path, Object.assign({ headers: headers }, opts || {}));
+    o.headers = headers;
+    const r = await fetch(c.url + path, o);
     if (!r.ok) {
       let msg = 'HTTP ' + r.status;
       try { const j = await r.json(); msg = j.msg || j.error_description || j.message || msg; } catch (e) {}

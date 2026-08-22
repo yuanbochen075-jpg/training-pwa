@@ -52,31 +52,55 @@
   }
 
   // ---------- Supabase REST ----------
+  async function refreshSession() {
+    const s = getSession();
+    if (!s || !s.refresh_token) return null;
+    const c = cfg();
+    try {
+      const r = await fetch(c.url + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': c.anon, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token })
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!j.access_token) return null;
+      setSession({ access_token: j.access_token, refresh_token: j.refresh_token || s.refresh_token, user: j.user || s.user });
+      return j;
+    } catch (e) { return null; }
+  }
   async function supFetch(path, opts) {
     const c = cfg();
-    const o = Object.assign({}, opts || {});
-    const headers = Object.assign({ 'apikey': c.anon, 'Content-Type': 'application/json' }, o.headers || {});
-    const s = getSession();
-    if (s && s.access_token) headers['Authorization'] = 'Bearer ' + s.access_token;
-    o.headers = headers;
-    const ctrl = new AbortController();
-    const timer = setTimeout(function () { ctrl.abort(); }, 20000);
-    o.signal = ctrl.signal;
-    let r;
-    try {
-      r = await fetch(c.url + path, o);
-    } catch (e) {
+    async function attempt(allowRefresh) {
+      const o = Object.assign({}, opts || {});
+      const headers = Object.assign({ 'apikey': c.anon, 'Content-Type': 'application/json' }, o.headers || {});
+      const s = getSession();
+      if (s && s.access_token) headers['Authorization'] = 'Bearer ' + s.access_token;
+      o.headers = headers;
+      const ctrl = new AbortController();
+      const timer = setTimeout(function () { ctrl.abort(); }, 20000);
+      o.signal = ctrl.signal;
+      let r;
+      try {
+        r = await fetch(c.url + path, o);
+      } catch (e) {
+        clearTimeout(timer);
+        throw new Error(e && e.name === 'AbortError' ? '请求超时，请检查网络' : (e.message || '网络错误'));
+      }
       clearTimeout(timer);
-      throw new Error(e && e.name === 'AbortError' ? '请求超时，请检查网络' : (e.message || '网络错误'));
+      if (!r.ok) {
+        if (allowRefresh && r.status === 401 && path.indexOf('/auth/v1/token') !== 0 && path.indexOf('/auth/v1/signup') !== 0 && path.indexOf('/auth/v1/logout') !== 0) {
+          const nj = await refreshSession();
+          if (nj) return attempt(false);
+        }
+        let msg = 'HTTP ' + r.status;
+        try { const j = await r.json(); msg = j.msg || j.error_description || j.message || msg; } catch (e) {}
+        throw new Error(msg);
+      }
+      const t = await r.text();
+      return t ? JSON.parse(t) : null;
     }
-    clearTimeout(timer);
-    if (!r.ok) {
-      let msg = 'HTTP ' + r.status;
-      try { const j = await r.json(); msg = j.msg || j.error_description || j.message || msg; } catch (e) {}
-      throw new Error(msg);
-    }
-    const t = await r.text();
-    return t ? JSON.parse(t) : null;
+    return attempt(true);
   }
   async function authSignUp(email, password) {
     const j = await supFetch('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email: email, password: password }) });

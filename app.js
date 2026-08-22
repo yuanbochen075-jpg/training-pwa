@@ -66,7 +66,7 @@
       return;
     }
     const needPriv = settings.privacy && !privKey;
-    if (needPriv) { showOverlay('privacyOverlay'); return; }
+    if (needPriv) { privacyMode = 'unlock'; showOverlay('privacyOverlay'); return; }
     finishBoot();
   }
   function showFatal(msg) {
@@ -195,15 +195,17 @@
     await loadAllData();
   }
   let privacyBound = false;
+  let privacyMode = 'unlock'; // unlock | change
   function bindPrivacy() {
     if (privacyBound) return;
     privacyBound = true;
     $('btnUnlock').addEventListener('click', async function () {
       const msg = $('privMsg');
       try {
-        if (settings.privacy) await unlockPrivacy($('privPass').value);
-        else await setPrivacy($('privPass').value);
+        if (privacyMode === 'change' || !settings.privacy) await setPrivacy($('privPass').value);
+        else await unlockPrivacy($('privPass').value);
         msg.textContent = '✔ 已解锁';
+        privacyMode = 'unlock';
         hideOverlay('privacyOverlay');
         finishBoot();
       } catch (e) { msg.className = 'form-msg err'; msg.textContent = e.message; }
@@ -724,7 +726,7 @@
       };
       reader.readAsText(f);
     });
-    $('btn-set-privacy').addEventListener('click', function () { showOverlay('privacyOverlay'); });
+    $('btn-set-privacy').addEventListener('click', function () { privacyMode = 'change'; showOverlay('privacyOverlay'); });
     const brp = $('btn-reset-privacy');
     if (brp) brp.addEventListener('click', resetPrivacy);
     $('btn-logout').addEventListener('click', async function () {

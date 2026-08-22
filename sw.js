@@ -2,7 +2,7 @@
  * sw.js — Service Worker
  * 功能：离线缓存壳 / Web Push 通知 / 本地定时通知
  */
-const CACHE = 'training-pwa-v1';
+const CACHE = 'training-pwa-v2';
 const SHELL = [
   './',
   './index.html',
@@ -28,14 +28,16 @@ self.addEventListener('activate', function (e) {
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(function (hit) {
-      return hit || fetch(e.request).then(function (res) {
-        const copy = res.clone();
-        if (res.ok && e.request.url.indexOf(self.location.origin) === 0) {
-          caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-        }
-        return res;
-      }).catch(function () { return caches.match('./index.html'); });
+    fetch(e.request).then(function (res) {
+      const copy = res.clone();
+      if (res.ok && e.request.url.indexOf(self.location.origin) === 0) {
+        caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      }
+      return res;
+    }).catch(function () {
+      return caches.match(e.request).then(function (hit) {
+        return hit || caches.match('./index.html');
+      });
     })
   );
 });

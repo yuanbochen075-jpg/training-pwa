@@ -417,7 +417,37 @@
   // ---------- 教练手动覆盖（无标注，直接替换当日计划） ----------
   // 结构：日期 -> 完整 day 对象（date/week/day/dow/phase/type/title/venue/duration/warmup/main/note/sleep/sex/foods）
   const COACH_OVERRIDES = {
-    // '2026-08-25': { type: 'speed', title: '速度日（调整）', venue: '田径场', duration: '50min', warmup: '...', main: [{ name: '...', sets: 1, reps: '...', pace: '...', rest: '...' }], note: '...' }
+    // 2026-08-24：自我训练(RPE9)后恢复日，弹跳基线顺延至8/27
+    '2026-08-24': {
+      type: 'aerobic', title: '恢复日（教练调整：自我训练后恢复）', venue: '操场/公园/家', duration: '30min',
+      warmup: '慢走5min + 全身拉伸',
+      main: [
+        { name: '快走或极慢跑', sets: 1, reps: '20-30min', pace: '心率110-130，能边走边说话' },
+        { name: '拉伸/泡沫轴', sets: 1, reps: '10min' }
+      ],
+      note: '昨晚大强度自我训练(RPE9)+睡眠质量一般：今天轻恢复，不测试不冲刺。弹跳基线已顺延至8/27（周四）。如实在想补测：摸高/CMJ/立定跳各3次取最好即可，别加量。',
+      foods: [
+        { when: '全天', items: '番茄、猕猴桃、核桃、石榴、蓝莓' },
+        { when: '晚餐', items: '正常蛋白质餐（鸡胸/鱼/鸡蛋）+ 一小把坚果' }
+      ]
+    },
+    // 2026-08-27：补测 W1D1 形态+弹跳基线（原8/24顺延）
+    '2026-08-27': {
+      type: 'test', title: '测试①（补）形态+弹跳基线', venue: '田径场/家', duration: '45min',
+      warmup: '动态热身10min + 慢跑5min',
+      main: [
+        { name: '体重/体脂', sets: 1, reps: '晨起空腹称重记录', note: '8/24晨重66.45已记录' },
+        { name: '助跑摸高', sets: 3, reps: '取最好成绩', note: '标尺或手机App' },
+        { name: '原地纵跳CMJ', sets: 3, reps: '取最好成绩' },
+        { name: '立定跳远', sets: 3, reps: '取最好成绩' }
+      ],
+      note: '补测基线（原8/24顺延，因8/23自我训练RPE9+睡眠一般）。测完若轻松加10min Zone2慢跑。',
+      foods: [
+        { when: '测试前1.5h', items: '香蕉1根 + 燕麦粥（少量）' },
+        { when: '测试后30min', items: '西瓜/橙汁 + 牛奶/鸡蛋' },
+        { when: '晚餐', items: '蓝莓/番茄 + 鱼/鸡胸 + 米饭' }
+      ]
+    }
   };
 
   // 每个练习项的「侧重点」与「强度」标注（名称关键词规则；override/自定义未标注时也用此函数）

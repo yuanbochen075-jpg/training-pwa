@@ -130,6 +130,18 @@
     dayItems = d.dayItems || {};
     weathers = d.weather || {};
     execs = d.exec || {};
+    // 旧格式兼容：旧记录 {name,done,pace,hr} → 重置为仅保留勾选，字段清空
+    Object.keys(execs).forEach(function (date) {
+      const e = execs[date];
+      if (e && Array.isArray(e.items)) {
+        e.items = e.items.map(function (it) {
+          if (it && typeof it === 'object' && it.w === undefined && it.sr === undefined) {
+            return { name: it.name, done: !!it.done, w: '', sr: '', pace: '', hr: '', dist: '', dur: '', note: '' };
+          }
+          return it;
+        });
+      }
+    });
     coros = d.coros || null;
     settings = d.settings || {};
     if (privKey) {
@@ -583,7 +595,29 @@
     renderToday();
   }
 
-  // ---------- 执行打卡（打卡页：今日项目勾选 + 实际配速/心率） ----------
+  // ---------- 执行打卡（打卡页：今日项目勾选 + 按类型显示实际完成字段） ----------
+  const EXEC_FIELD_LABELS = { w: '实际重量kg', sr: '组×次', pace: '配速/成绩', hr: '心率', dist: '距离/高度', dur: '时长min', note: '备注' };
+  const EXEC_FIELDS = ['w', 'sr', 'pace', 'hr', 'dist', 'dur', 'note'];
+  // 根据类别/侧重点/名称关键词推断该动作要记录哪些字段
+  function recordFields(m) {
+    if (!m) return ['note'];
+    const name = String(m.name || '');
+    const cat = String(m.cat || '');
+    const focus = String(m.focus || '');
+    if (/力量/.test(cat)) return ['w', 'sr', 'note'];
+    if (/跑步|有氧|骑行|游泳|球类/.test(cat)) return ['pace', 'hr', 'note'];
+    if (/跳跃/.test(cat)) return ['dist', 'sr', 'note'];
+    if (/力量/.test(focus)) return ['w', 'sr', 'note'];
+    if (/速度|耐力/.test(focus)) return ['pace', 'hr', 'note'];
+    if (/爆发/.test(focus)) return ['dist', 'sr', 'note'];
+    if (/核心/.test(focus)) return ['sr', 'note'];
+    if (/恢复|柔韧|技术/.test(focus)) return ['note'];
+    if (/平板|卷腹|举腿/.test(name)) return ['sr', 'note'];
+    if (/深蹲|硬拉|推举|卧推|划船|引体|提踵|分腿|面拉|侧平举|弯举/.test(name)) return ['w', 'sr', 'note'];
+    if (/跑|冲刺|间歇|骑行|游泳|慢跑|Zone2/.test(name)) return ['pace', 'hr', 'note'];
+    if (/跳|纵跳|摸高|立定/.test(name)) return ['dist', 'sr', 'note'];
+    return ['note'];
+  }
   function renderExecForm() {
     const box = $('execForm');
     if (!box) return;
@@ -597,15 +631,19 @@
     const saved = execs[currentDate] || { items: [] };
     const map = {};
     saved.items.forEach(function (it, i) { map[it.name] = i; });
-    let html = '<div class="sub" style="margin-bottom:8px">按「今日」展示的项目勾选完成情况，并填实际配速/心率：</div><div class="form-grid">';
-    p.main.forEach(function (m) {
+    let html = '<div class="sub" style="margin-bottom:8px">按「今日」项目勾选完成，并填实际完成参数（按动作类型自动显示对应字段）：</div><div class="form-grid">';
+    p.main.forEach(function (m, ri) {
       const idx = map[m.name];
       const it = idx != null ? saved.items[idx] : {};
+      const fields = recordFields(m);
+      let inputs = '';
+      fields.forEach(function (f) {
+        inputs += '<input type="text" data-exec-idx="' + ri + '" data-exec-field="' + f + '" placeholder="' + esc(EXEC_FIELD_LABELS[f] || f) + '" value="' + esc(it[f] || '') + '">';
+      });
       html += '<div class="exec-row">' +
-        '<label class="check-item" style="flex:0 0 auto;background:transparent;padding:4px 6px"><input type="checkbox" data-exec-name="' + esc(m.name) + '"' + (it.done ? ' checked' : '') + '> 完成</label>' +
-        '<div class="exec-meta"><b>' + esc(m.name) + '</b><span class="muted">' + esc(fmtEx(m)) + '</span></div>' +
-        '<div class="exec-inputs"><input type="text" data-exec-pace="' + esc(m.name) + '" placeholder="实际配速/成绩" value="' + esc(it.pace || '') + '">' +
-        '<input type="text" data-exec-hr="' + esc(m.name) + '" placeholder="心率" value="' + esc(it.hr || '') + '"></div>' +
+        '<label class="check-item" style="flex:0 0 auto;background:transparent;padding:4px 6px"><input type="checkbox" data-exec-idx="' + ri + '" data-exec-name="' + esc(m.name) + '"' + (it.done ? ' checked' : '') + '> 完成</label>' +
+        '<div class="exec-meta"><b>' + esc(m.name) + exBadges(m) + '</b><span class="muted">' + esc(fmtEx(m)) + '</span></div>' +
+        '<div class="exec-inputs">' + inputs + '</div>' +
         '</div>';
     });
     html += '<button class="btn primary" id="btn-save-exec">保存执行记录</button><span class="form-msg" id="execMsg"></span></div>';
@@ -613,12 +651,16 @@
   }
   function readExecForm() {
     const items = [];
-    const boxes = document.querySelectorAll('#execForm input[data-exec-name]');
+    const boxes = document.querySelectorAll('#execForm input[data-exec-idx][type="checkbox"]');
     boxes.forEach(function (cb) {
+      const ri = cb.getAttribute('data-exec-idx');
       const name = cb.getAttribute('data-exec-name');
-      const paceInp = document.querySelector('#execForm input[data-exec-pace="' + name.replace(/"/g, '&quot;') + '"]');
-      const hrInp = document.querySelector('#execForm input[data-exec-hr="' + name.replace(/"/g, '&quot;') + '"]');
-      items.push({ name: name, done: cb.checked, pace: paceInp ? paceInp.value.trim() : '', hr: hrInp ? hrInp.value.trim() : '' });
+      const item = { name: name, done: cb.checked, w: '', sr: '', pace: '', hr: '', dist: '', dur: '', note: '' };
+      document.querySelectorAll('#execForm input[data-exec-idx="' + ri + '"][data-exec-field]').forEach(function (inp) {
+        const f = inp.getAttribute('data-exec-field');
+        item[f] = inp.value.trim();
+      });
+      items.push(item);
     });
     return { items: items };
   }

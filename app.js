@@ -1045,7 +1045,14 @@
       reader.onload = async function () {
         try {
           const d = JSON.parse(reader.result);
-          checkins = d.checkins || {}; sleeps = d.sleep || {}; tests = d.tests || {}; exercises = d.exercises || {}; dayItems = d.dayItems || {}; weathers = d.weather || {}; execs = d.exec || {}; coros = d.coros || null;
+          if (d.checkins) Object.keys(d.checkins).forEach(function (k) { checkins[k] = d.checkins[k]; });
+          if (d.sleep) Object.keys(d.sleep).forEach(function (k) { sleeps[k] = d.sleep[k]; });
+          if (d.tests) Object.keys(d.tests).forEach(function (k) { tests[k] = d.tests[k]; });
+          if (d.exercises) Object.keys(d.exercises).forEach(function (k) { exercises[k] = d.exercises[k]; });
+          if (d.dayItems) Object.keys(d.dayItems).forEach(function (k) { dayItems[k] = d.dayItems[k]; });
+          if (d.weather) Object.keys(d.weather).forEach(function (k) { weathers[k] = d.weather[k]; });
+          if (d.exec) Object.keys(d.exec).forEach(function (k) { execs[k] = d.exec[k]; });
+          if (d.coros) coros = d.coros;
           if (d.settings && d.settings.privacy) settings = Object.assign(settings, { privacy: d.settings.privacy });
           for (const k of Object.keys(checkins)) await saveCheckinByDate(k, checkins[k]);
           for (const k of Object.keys(sleeps)) await saveSleep(k, sleeps[k]);

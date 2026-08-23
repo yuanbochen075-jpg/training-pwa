@@ -64,7 +64,7 @@
   const todayPlan = resolvePlan(currentDate);
   const weekPlan = PLAN.weeks[weekIdx - 1] || null;
 
-  let checkins = {}, sleeps = {}, tests = {}, exercises = {}, dayItems = {}, weathers = {}, execs = {}, coros = null, settings = {};
+  let checkins = {}, sleeps = {}, tests = {}, exercises = {}, dayItems = {}, weathers = {}, execs = {}, extra = Object.assign({}, window.EXTRA || {}), coros = null, settings = {};
   let privKey = null;
 
   // ---------- 加密辅助 ----------
@@ -130,6 +130,7 @@
     dayItems = d.dayItems || {};
     weathers = d.weather || {};
     execs = d.exec || {};
+    extra = Object.assign(extra, d.extra || {});
     // 旧格式兼容：旧记录 {name,done,pace,hr} → 重置为仅保留勾选，字段清空
     Object.keys(execs).forEach(function (date) {
       const e = execs[date];
@@ -516,8 +517,30 @@
     $('ruleBody').innerHTML = rules.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('');
 
     renderDayCustom();
+    renderExtra();
   }
 
+  function extraDay(date) { const ex = extra[date]; return !!(ex && ex.sessions && ex.sessions.length); }
+  function renderExtra() {
+    const card = $('extraCard');
+    const box = $('extraBody');
+    if (!card || !box) return;
+    const rec = extra[currentDate];
+    if (!rec || !rec.sessions || !rec.sessions.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    let html = '';
+    rec.sessions.forEach(function (s) {
+      html += '<div class="card-title" style="margin:8px 0 4px">' + esc(s.title || '加练') + '　<span class="muted">' + esc(s.venue || '') + ' · ' + esc((s.duration != null ? s.duration + 'min' : '')) + '</span></div>';
+      if (s.main && s.main.length) {
+        html += '<ul class="exercise-list">';
+        s.main.forEach(function (m) { html += '<li><span class="exercise-name">' + esc(m.name) + '</span><span class="exercise-detail">' + esc(fmtEx(m)) + '</span></li>'; });
+        html += '</ul>';
+      }
+      if (s.rpe) html += '<div class="kv"><b>RPE：</b><span class="val">' + esc(s.rpe) + '/20</span></div>';
+      if (s.note) html += '<div class="note">💡 ' + esc(s.note) + '</div>';
+    });
+    box.innerHTML = html;
+  }
   function renderDayCustom() {
     const box = $('dayCustomBox');
     if (!box) return;
@@ -825,7 +848,7 @@
     weekPlan.days.forEach(function (d) {
       const c = checkins[d.date] || {};
       const tick = function (v) { return v ? '✔' : '·'; };
-      html += '<tr><td>' + esc(d.date.slice(5)) + '</td><td>' + tick(c.training) + '</td><td>' + tick(c.sleep) + '</td><td>' + tick(c.morning) + '</td><td>' + (c.mast || 0) + '</td><td>' + esc(c.rpe || '') + '</td></tr>';
+      html += '<tr><td>' + esc(d.date.slice(5)) + '</td><td>' + tick(c.training || extraDay(d.date)) + '</td><td>' + tick(c.sleep) + '</td><td>' + tick(c.morning) + '</td><td>' + (c.mast || 0) + '</td><td>' + esc(c.rpe || '') + '</td></tr>';
     });
     html += '</table>';
     box.innerHTML = html;
@@ -836,7 +859,7 @@
     let training = 0, sleep = 0, morning = 0, mast = 0, rpeSum = 0, rpeN = 0;
     if (weekPlan) weekPlan.days.forEach(function (d) {
       const c = checkins[d.date]; if (!c) return;
-      if (c.training) training++;
+      if (c.training || extraDay(d.date)) training++;
       if (c.sleep) sleep++;
       if (c.morning) morning++;
       mast += Number(c.mast) || 0;
@@ -860,7 +883,7 @@
     Object.keys(checkins).forEach(function (date) {
       if (!date.startsWith(mk)) return;
       const c = checkins[date]; md++;
-      if (c.training) mt++;
+      if (c.training || extraDay(date)) mt++;
       if (c.sleep) ms++;
       if (c.morning) mm++;
       mma += Number(c.mast) || 0;
@@ -885,16 +908,29 @@
   }
   // 单日负荷：打卡RPE(6-20 映射到0-10 CR10) × 时长；未填时长退回计划时长
   function dayLoad(date) {
+    let load = 0;
     const c = checkins[date];
-    if (!c || !c.training || !c.rpe) return 0;
-    const rpe = Number(c.rpe);
-    const cr10 = Math.max(0, Math.min(10, (rpe - 6) / 14 * 10));
-    let dur = Number(c.duration) || 0;
-    if (!dur) {
-      const d = allDays.find(function (x) { return x.date === date; });
-      dur = parsePlanMin(d ? d.duration : '') || 0;
+    if (c && c.training && c.rpe) {
+      const rpe = Number(c.rpe);
+      const cr10 = Math.max(0, Math.min(10, (rpe - 6) / 14 * 10));
+      let dur = Number(c.duration) || 0;
+      if (!dur) {
+        const d = allDays.find(function (x) { return x.date === date; });
+        dur = parsePlanMin(d ? d.duration : '') || 0;
+      }
+      load += Math.round(cr10 * dur * 10) / 10;
     }
-    return Math.round(cr10 * dur * 10) / 10;
+    const ex = extra[date];
+    if (ex && Array.isArray(ex.sessions)) {
+      ex.sessions.forEach(function (sess) {
+        if (!sess || !sess.rpe) return;
+        const cr10 = Math.max(0, Math.min(10, (Number(sess.rpe) - 6) / 14 * 10));
+        let dur = Number(sess.duration) || 0;
+        if (!dur) dur = parsePlanMin(String(sess.duration)) || 0;
+        load += Math.round(cr10 * dur * 10) / 10;
+      });
+    }
+    return Math.round(load * 10) / 10;
   }
   function sumRange(from, to) {
     let s = 0;
@@ -1072,7 +1108,7 @@
     });
     $('btn-clear-cloud').addEventListener('click', function () { API.clearCloudCfg(); });
     $('btn-export').addEventListener('click', function () {
-      const blob = new Blob([JSON.stringify({ checkins: checkins, sleep: sleeps, tests: tests, exercises: exercises, dayItems: dayItems, weather: weathers, exec: execs, coros: coros, settings: settings }, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify({ checkins: checkins, sleep: sleeps, tests: tests, exercises: exercises, dayItems: dayItems, weather: weathers, exec: execs, extra: extra, coros: coros, settings: settings }, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = '训练助手备份-' + todayStr() + '.json';
@@ -1094,6 +1130,7 @@
           if (d.dayItems) Object.keys(d.dayItems).forEach(function (k) { dayItems[k] = d.dayItems[k]; });
           if (d.weather) Object.keys(d.weather).forEach(function (k) { weathers[k] = d.weather[k]; });
           if (d.exec) Object.keys(d.exec).forEach(function (k) { execs[k] = d.exec[k]; });
+          if (d.extra) Object.keys(d.extra).forEach(function (k) { extra[k] = d.extra[k]; });
           if (d.coros) coros = d.coros;
           if (d.settings && d.settings.privacy) settings = Object.assign(settings, { privacy: d.settings.privacy });
           for (const k of Object.keys(checkins)) await saveCheckinByDate(k, checkins[k]);
@@ -1103,6 +1140,7 @@
           for (const k of Object.keys(dayItems)) await saveDayItems(k, dayItems[k]);
           for (const k of Object.keys(weathers)) await saveWeather(k, weathers[k]);
           for (const k of Object.keys(execs)) await saveExec(k, execs[k]);
+          for (const k of Object.keys(extra)) await API.save('extra', k, extra[k]);
           if (coros) await saveCoros(coros);
           if (settings.reminders) await API.saveSetting('reminders', settings.reminders);
           $('backupMsg').textContent = '✔ 导入完成，请刷新';

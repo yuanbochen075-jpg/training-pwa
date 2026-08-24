@@ -112,6 +112,23 @@
         <div id="execForm">—</div>
       </div>
       <div class="card">
+        <div class="card-title">➕ 加练记录（计划外补录，计入训练负荷）</div>
+        <div class="form-grid" id="extraForm">
+          <label class="field-label">日期 <input type="date" id="ex-date"></label>
+          <label class="field-label">标题 <input type="text" id="ex-title" placeholder="如：加练·自重深蹲"></label>
+          <label class="field-label">场地 <input type="text" id="ex-venue" placeholder="如：家 / 操场"></label>
+          <label class="field-label">时长（分钟） <input type="number" id="ex-duration" min="0" max="600"></label>
+          <label class="field-label">RPE（6-20） <input type="number" id="ex-rpe" min="6" max="20"></label>
+          <label class="field-label">备注 <input type="text" id="ex-note" placeholder="可选"></label>
+          <div class="field-label">动作行
+            <div id="ex-main-rows"></div>
+            <button class="btn mini" type="button" id="btn-ex-add-row">+ 加一个动作</button>
+          </div>
+          <button class="btn primary" id="btn-save-extra">保存加练记录</button>
+          <span class="form-msg" id="extraMsg"></span>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-title">✅ 今日打卡</div>
         <div class="form-grid" id="checkinForm">
           <label class="check-item"><input type="checkbox" id="ck-training"> 训练完成</label>
@@ -137,6 +154,10 @@
       <div class="card"><div class="card-title">🏋️ 训练负荷（周/月）</div><div id="loadStats">—</div></div>
       <div class="card"><div class="card-title">📈 本月统计</div><div id="monthStats">—</div></div>
       <div class="card"><div class="card-title">⚖️ 体重趋势</div><div id="weightTrend">—</div></div>
+      <div class="card"><div class="card-title">📋 历史记录</div><div id="historyTabs" class="tabs" style="position:static;border:none;margin-bottom:6px">
+        <button class="tab active" data-hist="week" style="border-bottom:2px solid var(--accent)">本周</button>
+        <button class="tab" data-hist="month">本月</button>
+      </div><div id="historyList">—</div></div>
     </section>
 
     <!-- 成绩 -->

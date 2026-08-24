@@ -174,6 +174,7 @@
           dayItems: d.dayItem || {},
           weather: d.weather || {},
           exec: d.exec || {},
+          extra: d.extra || {},
           coros: d.coros ? d.coros['latest'] : null,
           settings: d.setting || {},
           pushSub: d.pushSub ? d.pushSub['latest'] : null
@@ -188,6 +189,7 @@
         dayItems: d.dayItem || {},
         weather: d.weather || {},
         exec: d.exec || {},
+        extra: d.extra || {},
         coros: d.coros ? d.coros['latest'] : null,
         settings: d.setting || {},
         pushSub: d.pushSub ? d.pushSub['latest'] : null

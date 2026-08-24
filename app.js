@@ -162,6 +162,7 @@
     renderNextPreview();
     fillCheckinForm();
     renderExecForm();
+    renderExtraForm();
     renderWeekCheckins();
     renderSleepForm();
     renderSleepAutoEval();
@@ -175,6 +176,7 @@
     renderSettings();
     renderReminders();
     renderAccount();
+    bindHistory();
     bindEvents();
     scheduleReminders();
     registerSW();
@@ -476,7 +478,7 @@
   }
   // ---------- 今日 ----------
   function renderToday() {
-    if (!todayPlan) { $('todayBody').innerHTML = '<div class="empty">计划未开始</div>'; return; }
+    if (!todayPlan) { $('todayBody').innerHTML = '<div class="empty">计划未开始</div>'; renderExtra(); return; }
     const st = sleepStatus();
     const wx = weatherStatus();
     const p = adjustedDay(todayPlan, st, wx);
@@ -541,6 +543,79 @@
     });
     box.innerHTML = html;
   }
+  // ---------- 加练记录（打卡页录入，存 Supabase kind=extra，与静态 extra-data.js 合并） ----------
+  function renderExtraForm() {
+    const box = $('extraForm');
+    if (!box) return;
+    $('ex-date').value = currentDate;
+    const rec = extra[currentDate];
+    if (rec && rec.sessions && rec.sessions.length) {
+      const last = rec.sessions[rec.sessions.length - 1];
+      $('ex-title').value = last.title || '';
+      $('ex-venue').value = last.venue || '';
+      $('ex-duration').value = last.duration != null ? last.duration : '';
+      $('ex-rpe').value = last.rpe != null ? last.rpe : '';
+      $('ex-note').value = last.note || '';
+      renderExtraMainRows(last.main || []);
+    } else {
+      $('ex-title').value = ''; $('ex-venue').value = ''; $('ex-duration').value = ''; $('ex-rpe').value = ''; $('ex-note').value = '';
+      renderExtraMainRows([]);
+    }
+  }
+  function renderExtraMainRows(main) {
+    const box = $('ex-main-rows');
+    if (!box) return;
+    const arr = main && main.length ? main : [{ name: '', detail: '' }];
+    let html = '';
+    arr.forEach(function (m, i) {
+      html += '<div style="display:flex;gap:6px;margin:4px 0"><input type="text" data-ex-mname="' + i + '" placeholder="动作名（如 自重深蹲）" value="' + esc(m.name || '') + '" style="flex:1;min-width:0"><input type="text" data-ex-mdetail="' + i + '" placeholder="组次/配速（如 5×200个）" value="' + esc(m.detail || '') + '" style="flex:1.2;min-width:0"><button class="btn mini danger" type="button" data-ex-mrm="' + i + '">删</button></div>';
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('[data-ex-mrm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        const rows = readExtraMainRows();
+        if (rows.length <= 1) return;
+        renderExtraMainRows(rows.filter(function (_, idx) { return idx !== Number(b.getAttribute('data-ex-mrm')); }));
+      });
+    });
+  }
+  function readExtraMainRows() {
+    const rows = [];
+    document.querySelectorAll('#ex-main-rows [data-ex-mname]').forEach(function (inp) {
+      const i = inp.getAttribute('data-ex-mname');
+      const dInp = document.querySelector('#ex-main-rows [data-ex-mdetail="' + i + '"]');
+      const name = inp.value.trim();
+      const detail = dInp ? dInp.value.trim() : '';
+      if (name) rows.push({ name: name, detail: detail });
+    });
+    return rows;
+  }
+  async function onSaveExtra() {
+    const msg = $('extraMsg');
+    if (!msg) return;
+    const date = $('ex-date').value;
+    if (!date) { msg.textContent = '请选择日期'; msg.className = 'form-msg err'; return; }
+    const main = readExtraMainRows();
+    if (!main.length) { msg.textContent = '至少填一个动作名'; msg.className = 'form-msg err'; return; }
+    const session = {
+      title: $('ex-title').value.trim() || '加练',
+      venue: $('ex-venue').value.trim(),
+      duration: Math.max(0, parseInt($('ex-duration').value, 10) || 0) || undefined,
+      rpe: Math.max(0, parseInt($('ex-rpe').value, 10) || 0) || undefined,
+      main: main,
+      note: $('ex-note').value.trim()
+    };
+    // 同日期 sessions 追加（静态为底 + 云端合并）
+    const existing = extra[date] || { sessions: [] };
+    const sessions = (existing.sessions || []).concat([session]);
+    extra[date] = { sessions: sessions };
+    try {
+      await API.save('extra', date, extra[date]);
+      msg.textContent = '✔ 已保存加练记录' + (API.isCloud() ? '并同步云端' : '（本机）');
+      msg.className = 'form-msg';
+    } catch (e) { msg.textContent = '保存失败：' + e.message; msg.className = 'form-msg err'; }
+    renderExtra(); renderStats(); renderWeekCheckins();
+  }
   function renderDayCustom() {
     const box = $('dayCustomBox');
     if (!box) return;
@@ -573,6 +648,7 @@
       dayItems[currentDate] = arr;
       await saveDayItems(currentDate, arr);
       renderDayCustom();
+      renderExecForm();
     });
     box.querySelectorAll('[data-rm]').forEach(function (btn) {
       btn.addEventListener('click', async function () {
@@ -580,6 +656,7 @@
         dayItems[currentDate] = arr;
         await saveDayItems(currentDate, arr);
         renderDayCustom();
+        renderExecForm();
       });
     });
   }
@@ -651,11 +728,16 @@
     const st = sleepStatus();
     const wx = weatherStatus();
     const p = adjustedDay(todayPlan, st, wx);
+    // 合并计划内项目 + 今日自定义项目（同名去重，计划优先）
+    const items = [];
+    const seen = {};
+    (p.main || []).forEach(function (m) { if (m && m.name && !seen[m.name]) { seen[m.name] = true; items.push(m); } });
+    (dayItems[currentDate] || []).forEach(function (m) { if (m && m.name && !seen[m.name]) { seen[m.name] = true; items.push(m); } });
     const saved = execs[currentDate] || { items: [] };
     const map = {};
     saved.items.forEach(function (it, i) { map[it.name] = i; });
     let html = '<div class="sub" style="margin-bottom:8px">按「今日」项目勾选完成，并填实际完成参数（按动作类型自动显示对应字段）：</div><div class="form-grid">';
-    p.main.forEach(function (m, ri) {
+    items.forEach(function (m, ri) {
       const idx = map[m.name];
       const it = idx != null ? saved.items[idx] : {};
       const fields = recordFields(m);
@@ -896,6 +978,92 @@
       const diff = weights[weights.length - 1].w - weights[0].w;
       $('weightTrend').innerHTML = '<div class="kv"><b>最新：</b><span class="val">' + last.w + ' kg（' + last.date + '）</span></div><div class="kv"><b>记录：</b><span class="val">' + weights.map(function (x) { return x.date.slice(5) + ':' + x.w; }).join('　') + '</span></div><div class="kv"><b>趋势：</b><span class="val">' + (diff >= 0 ? '▲ +' : '▼ ') + diff.toFixed(1) + ' kg（首末）</span></div>';
     } else $('weightTrend').innerHTML = '<div class="empty">暂无体重记录</div>';
+
+    renderHistory();
+  }
+
+  // ---------- 历史记录（统计页，本周/本月可展开） ----------
+  let historyMode = 'week';
+  function historyDates() {
+    if (historyMode === 'month') {
+      const mk = currentDate.slice(0, 7);
+      return Object.keys(checkins).filter(function (d) { return d.startsWith(mk); }).sort().reverse();
+    }
+    const d = parseDate(currentDate);
+    const dow = (d.getDay() + 6) % 7; // 周一=0
+    const monday = addDays(currentDate, -dow);
+    const out = [];
+    for (let i = 0; i < 7; i++) { const dt = addDays(monday, i); if (checkins[dt]) out.push(dt); }
+    return out.sort().reverse();
+  }
+  function historyDayDetail(date) {
+    const c = checkins[date] || {};
+    const ex = extra[date];
+    const exec = execs[date];
+    let html = '';
+    html += '<div class="kv"><b>睡眠达标：</b><span class="val">' + (c.sleep ? '是' : '否') + '</span>　<b>晨勃：</b><span class="val">' + (c.morning ? '有' : '无') + '</span>　<b>手淫：</b><span class="val">' + (Number(c.mast) || 0) + '</span></div>';
+    if (c.weight) html += '<div class="kv"><b>晨重：</b><span class="val">' + esc(c.weight) + ' kg</span></div>';
+    if (c.rpe) html += '<div class="kv"><b>RPE：</b><span class="val">' + esc(c.rpe) + ' / 20</span></div>';
+    if (c.note) html += '<div class="kv"><b>备注：</b><span class="val">' + esc(c.note) + '</span></div>';
+    if (exec && exec.items && exec.items.length) {
+      const done = exec.items.filter(function (it) { return it.done; });
+      const undone = exec.items.filter(function (it) { return !it.done; });
+      html += '<div class="kv"><b>执行：</b><span class="val">完成 ' + done.length + ' / ' + exec.items.length + '</span></div>';
+      if (done.length) {
+        html += '<ul class="exercise-list">';
+        done.forEach(function (it) {
+          const bits = [];
+          if (it.w) bits.push(it.w + 'kg');
+          if (it.sr) bits.push(it.sr);
+          if (it.pace) bits.push('配速 ' + it.pace);
+          if (it.hr) bits.push('心率 ' + it.hr);
+          if (it.dist) bits.push(it.dist);
+          if (it.dur) bits.push(it.dur + 'min');
+          if (it.note) bits.push(it.note);
+          html += '<li><span class="exercise-name">' + esc(it.name) + '</span><span class="exercise-detail">' + esc(bits.join(' · ')) + '</span></li>';
+        });
+        html += '</ul>';
+      }
+      if (undone.length) html += '<div class="muted" style="font-size:12px">未完成：' + esc(undone.map(function (it) { return it.name; }).join('、')) + '</div>';
+    }
+    if (ex && ex.sessions && ex.sessions.length) {
+      html += '<div class="note" style="margin-top:4px">➕ 加练 ' + ex.sessions.length + ' 条</div>';
+      ex.sessions.forEach(function (s) {
+        html += '<div class="kv"><b>' + esc(s.title || '加练') + '</b><span class="val">' + esc(s.venue || '') + ' · ' + (s.duration != null ? s.duration + 'min' : '') + ' · RPE ' + esc(s.rpe || '—') + '</span></div>';
+      });
+    }
+    return html;
+  }
+  function renderHistory() {
+    const list = $('historyList');
+    if (!list) return;
+    const dates = historyDates();
+    if (!dates.length) { list.innerHTML = '<div class="empty">暂无记录</div>'; return; }
+    const tabs = document.querySelectorAll('[data-hist]');
+    tabs.forEach(function (t) { t.classList.toggle('active', t.getAttribute('data-hist') === historyMode); });
+    let html = '';
+    dates.forEach(function (date) {
+      const c = checkins[date] || {};
+      const trained = !!(c.training || extraDay(date));
+      html += '<div class="hist-item"><button class="hist-btn" data-hist-date="' + date + '"><span class="d">' + esc(date.slice(5)) + '</span><span>' + (trained ? '✔ 训练' : '·') + '</span><span>睡眠' + (c.sleep ? '✔' : '✘') + '</span><span>晨勃' + (c.morning ? '✔' : '✘') + '</span><span>RPE ' + esc(c.rpe || '—') + '</span></button><div class="hist-detail" id="hist-detail-' + date + '" style="display:none">' + historyDayDetail(date) + '</div></div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-hist-date]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const date = btn.getAttribute('data-hist-date');
+        const box = document.getElementById('hist-detail-' + date);
+        if (box) box.style.display = box.style.display === 'none' ? '' : 'none';
+      });
+    });
+  }
+  function bindHistory() {
+    const tabs = document.querySelectorAll('[data-hist]');
+    tabs.forEach(function (t) {
+      t.addEventListener('click', function () {
+        historyMode = t.getAttribute('data-hist');
+        renderHistory();
+      });
+    });
   }
 
   // ---------- 训练负荷（Foster sRPE + 单调性/应变 + ACWR） ----------
@@ -1275,6 +1443,8 @@
     $('btn-save-ex').addEventListener('click', onSaveExercise);
     const bsw = $('btn-save-weather'); if (bsw) bsw.addEventListener('click', onSaveWeather);
     const bse = $('btn-save-exec'); if (bse) bse.addEventListener('click', onSaveExec);
+    const bse2 = $('btn-save-extra'); if (bse2) bse2.addEventListener('click', onSaveExtra);
+    const bar = $('btn-ex-add-row'); if (bar) bar.addEventListener('click', function () { renderExtraMainRows(readExtraMainRows().concat([{ name: '', detail: '' }])); });
     bindSettings();
     bindReminders();
     bindAuth();

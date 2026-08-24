@@ -27,7 +27,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site/icons
-          cp index.html style.css app.js plan-data.js config.js crypto.js api.js manifest.webmanifest sw.js _site/
+          cp index.html style.css app.js plan-data.js extra-data.js config.js crypto.js api.js manifest.webmanifest sw.js _site/
           cp icons/icon-192.png icons/icon-512.png _site/icons/
           touch _site/.nojekyll
           rm -rf _site/.github _site/scripts _site/tools _site/supabase _site/api _site/.vercel

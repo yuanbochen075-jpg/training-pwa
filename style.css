@@ -211,3 +211,14 @@ input[type="time"], input[type="date"] { background: var(--card2); color: var(--
 .int-high { color: #ff8a65; background: rgba(255,138,101,.18); }
 .int-peak { color: #ff5252; background: rgba(255,82,82,.2); }
 .exercise-name { display: flex; align-items: center; flex-wrap: wrap; }
+
+
+/* 历史记录（统计页） */
+.hist-item { border-bottom: 1px dashed var(--border); padding: 6px 0; }
+.hist-btn {
+  display: flex; width: 100%; gap: 10px; justify-content: space-between; align-items: center;
+  background: transparent; border: none; color: var(--text); font-size: 13.5px; cursor: pointer; text-align: left;
+}
+.hist-btn .d { color: var(--accent); font-weight: 700; }
+.hist-detail { padding: 6px 4px 2px; font-size: 13px; }
+.hist-detail .muted { color: var(--muted); }

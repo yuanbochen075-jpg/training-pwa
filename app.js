@@ -64,7 +64,7 @@
   const todayPlan = resolvePlan(currentDate);
   const weekPlan = PLAN.weeks[weekIdx - 1] || null;
 
-  let checkins = {}, sleeps = {}, tests = {}, exercises = {}, dayItems = {}, weathers = {}, execs = {}, extra = Object.assign({}, window.EXTRA || {}), coros = null, settings = {};
+  let checkins = {}, sleeps = {}, naps = {}, tests = {}, exercises = {}, dayItems = {}, weathers = {}, execs = {}, extra = Object.assign({}, window.EXTRA || {}), coros = null, settings = {};
   let privKey = null;
 
   // ---------- 加密辅助 ----------
@@ -76,6 +76,7 @@
   // ---------- 数据保存 ----------
   async function saveCheckin() { await API.save('checkin', currentDate, await encryptCheckin(checkins[currentDate])); }
   async function saveSleep(date, data) { await API.save('sleep', date, await encryptSleep(data)); }
+  async function saveNap(date, data) { await API.save('nap', date, data); }
   async function saveTests() { for (const k of Object.keys(tests)) await API.save('test', k, tests[k]); }
   async function saveExercise(id, data) { await API.save('exercise', id, data); }
   async function removeExercise(id) { await API.remove('exercise', id); }
@@ -125,6 +126,7 @@
     const d = await API.loadAll();
     checkins = d.checkins || {};
     sleeps = d.sleep || {};
+    naps = d.nap || {};
     tests = d.tests || {};
     exercises = d.exercises || {};
     dayItems = d.dayItems || {};
@@ -165,9 +167,11 @@
     renderExtraForm();
     renderWeekCheckins();
     renderSleepForm();
+    renderNapForm();
     renderSleepAutoEval();
     renderSleepHistory();
     renderSleepWeekAvg();
+    renderNapHistory();
     renderStats();
     renderTestForm();
     renderTestProgress();
@@ -846,7 +850,7 @@
     renderSleepAutoEval();
     try { await saveSleep(date, sleeps[date]); msg.textContent = '✔ 已保存' + (API.isCloud() ? '并同步云端' : '（本机）'); msg.className = 'form-msg'; }
     catch (e) { msg.textContent = '保存失败：' + e.message; msg.className = 'form-msg err'; }
-    renderSleepHistory(); renderSleepWeekAvg(); updateSleepBanner(); renderToday(); renderNextPreview(); switchTab('today');
+    renderSleepHistory(); renderSleepWeekAvg(); renderNapHistory(); updateSleepBanner(); renderToday(); renderNextPreview(); switchTab('today');
   }
   function renderSleepHistory() {
     const box = $('sleepHistory');
@@ -886,6 +890,63 @@
       '<div class="kv"><b>平均个人状态：</b><span class="val">' + (qn ? (qualitySum / qn).toFixed(1) : '—') + ' / 10</span></div>' +
       '<div class="kv"><b>平均入睡：</b><span class="val">' + bedHM + '</span></div>';
   }
+  // ---------- 午睡 ----------
+  function napMinutes(s) {
+    if (!s || !s.start || !s.end) return null;
+    const p = function (v) { const a = String(v).split(':').map(Number); return a.length >= 2 ? a[0] * 60 + a[1] : null; };
+    const st = p(s.start), en = p(s.end);
+    if (st == null || en == null) return null;
+    let d = en - st;
+    if (d < 0) d += 1440; // 跨天视为次日
+    return d;
+  }
+  function renderNapForm() {
+    const box = $('np-date');
+    if (!box) return;
+    $('np-date').value = currentDate;
+    const n = naps[currentDate] || {};
+    $('np-start').value = n.start || '13:00';
+    $('np-end').value = n.end || '14:00';
+    $('np-state').value = n.state != null ? n.state : '';
+    $('np-note').value = n.note || '';
+  }
+  function readNapForm() {
+    return {
+      start: $('np-start').value,
+      end: $('np-end').value,
+      state: $('np-state').value !== '' ? Math.max(1, Math.min(10, parseInt($('np-state').value, 10) || 0)) : undefined,
+      note: $('np-note').value.trim()
+    };
+  }
+  async function onSaveNap() {
+    const msg = $('napMsg');
+    if (!msg) return;
+    const date = $('np-date').value;
+    if (!date) { msg.textContent = '请选择日期'; msg.className = 'form-msg err'; return; }
+    const d = readNapForm();
+    naps[date] = d;
+    try {
+      await saveNap(date, d);
+      msg.textContent = '✔ 已保存午睡' + (API.isCloud() ? '并同步云端' : '（本机）');
+      msg.className = 'form-msg';
+    } catch (e) { msg.textContent = '保存失败：' + e.message; msg.className = 'form-msg err'; }
+    renderNapHistory();
+  }
+  function renderNapHistory() {
+    const box = $('napHistory');
+    if (!box) return;
+    const dates = Object.keys(naps).sort().reverse().slice(0, 7);
+    if (!dates.length) { box.innerHTML = '<div class="empty">暂无午睡记录</div>'; return; }
+    let html = '<table><tr><th>日期</th><th>开始-结束</th><th>时长</th><th>状态</th></tr>';
+    dates.forEach(function (date) {
+      const n = naps[date];
+      const mins = napMinutes(n);
+      html += '<tr><td>' + esc(date) + '</td><td>' + esc(n.start || '') + '-' + esc(n.end || '') + '</td><td>' + (mins != null ? fmtMin(mins) : '—') + '</td><td>' + esc(n.state != null ? n.state : '—') + '</td></tr>';
+    });
+    html += '</table>';
+    box.innerHTML = html;
+  }
+
   // ---------- 打卡 ----------
   function weekMastCount() {
     let sum = 0;
@@ -1444,6 +1505,7 @@
     const bsw = $('btn-save-weather'); if (bsw) bsw.addEventListener('click', onSaveWeather);
     const bse = $('btn-save-exec'); if (bse) bse.addEventListener('click', onSaveExec);
     const bse2 = $('btn-save-extra'); if (bse2) bse2.addEventListener('click', onSaveExtra);
+    const bsn = $('btn-save-nap'); if (bsn) bsn.addEventListener('click', onSaveNap);
     const bar = $('btn-ex-add-row'); if (bar) bar.addEventListener('click', function () { renderExtraMainRows(readExtraMainRows().concat([{ name: '', detail: '' }])); });
     bindSettings();
     bindReminders();

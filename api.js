@@ -169,6 +169,7 @@
         return {
           checkins: d.checkin || {},
           sleep: d.sleep || {},
+          nap: d.nap || {},
           tests: d.test || {},
           exercises: d.exercise || {},
           dayItems: d.dayItem || {},
@@ -184,6 +185,7 @@
       return {
         checkins: d.checkin || {},
         sleep: d.sleep || {},
+        nap: d.nap || {},
         tests: d.test || {},
         exercises: d.exercise || {},
         dayItems: d.dayItem || {},

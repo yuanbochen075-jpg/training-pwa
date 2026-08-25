@@ -89,8 +89,22 @@
         <div class="auto-eval" id="sleepAutoEval">自动评测：—</div>
         <div class="sub" style="margin-top:6px">自动评分：时长7-9h / 效率≥85% / 深睡16-20% / REM 21-30% / 入睡23:00±30min / 规律性(近7天入睡时点稳定)；综合=自动70%+个人30%</div>
       </div>
+      <div class="card">
+        <div class="card-title">😪 午睡记录</div>
+        <div class="sub">记录午睡（可选），与晚间睡眠分开保存</div>
+        <div class="form-grid">
+          <label class="field-label">日期 <input type="date" id="np-date"></label>
+          <label class="field-label">开始时间 <input type="time" id="np-start" value="13:00"></label>
+          <label class="field-label">结束时间 <input type="time" id="np-end" value="14:00"></label>
+          <label class="field-label">醒来状态（1-10，可空） <input type="number" id="np-state" min="1" max="10" placeholder="如 7"></label>
+          <label class="field-label">备注 <input type="text" id="np-note" placeholder="可选"></label>
+          <button class="btn primary" id="btn-save-nap">保存午睡记录</button>
+          <span class="form-msg" id="napMsg"></span>
+        </div>
+      </div>
       <div class="card"><div class="card-title">📅 近7天睡眠</div><div id="sleepHistory">—</div></div>
       <div class="card"><div class="card-title">📊 本周平均</div><div id="sleepWeekAvg">—</div></div>
+      <div class="card"><div class="card-title">💤 近7天午睡</div><div id="napHistory">—</div></div>
     </section>
 
     <!-- 今日 -->

@@ -448,37 +448,77 @@
     }
     // 天气自动调整
     if (wx && wx.reasons && wx.reasons.length) {
+      // 雨天：户外田径场/操场训练替换为室内替代
+      if (wx.rain && /操场|田径场/.test(copy.venue || '')) {
+        const rainRepl = {
+          speed: { title: '雨天·室内速度/技术', venue: '健身房/室内', duration: '45-55min', warmup: '室内动态热身8min + A/B skip 原地',
+            main: [ { name: '原地高抬腿/车轮跑', sets: 4, reps: '20-30s', rest: '组间1min' }, { name: '起跑姿势练习', sets: 5, reps: '3-4次', rest: '组间1min', note: '镜子/手机录像纠姿' }, { name: '跳箱(30-45cm)', sets: 4, reps: '5次', rest: '组间1-2min' }, { name: '小力量：保加利亚分腿蹲', sets: 3, reps: '8次/侧' } ],
+            note: '雨天：改室内技术+弹跳，跑道项目顺延' },
+          speedEnd: { title: '雨天·室内耐力/跑步机', venue: '健身房', duration: '40-50min', warmup: '室内动态热身8min',
+            main: [ { name: '跑步机慢跑', sets: 1, reps: '20-30min', pace: '心率120-145' }, { name: '快走坡度交替', sets: 1, reps: '10min', pace: '坡度6-8%' }, { name: '核心组合', sets: 3, reps: '各30-45s' } ],
+            note: '雨天：400m专项顺延，用跑步机保底有氧' },
+          aerobic: { title: '雨天·室内有氧替代', venue: '健身房/家', duration: '35-45min', warmup: '室内动态热身5min',
+            main: [ { name: '跑步机/原地有氧', sets: 1, reps: '25-35min', pace: '心率120-140' }, { name: '柔韧拉伸', sets: 1, reps: '10min' } ],
+            note: '雨天：户外Zone2改室内，保持轻松' },
+          longAerobic: { title: '雨天·室内轻松有氧', venue: '健身房/家', duration: '30-40min', warmup: '室内动态热身5min',
+            main: [ { name: '跑步机/原地有氧', sets: 1, reps: '25-30min', pace: '心率120-140' } ],
+            note: '雨天：长有氧改室内；如打排球则改室内球场' },
+          test: { title: '测试改期', venue: '—', duration: '—', warmup: '',
+            main: [ { name: '室内恢复：轻松有氧+拉伸', sets: 1, reps: '20-30min', pace: '心率120-130' } ],
+            note: '雨天：测试日改期到晴好天，今天只做轻松恢复' }
+        };
+        const repl = rainRepl[copy.type];
+        if (repl) {
+          copy.title = repl.title;
+          copy.venue = repl.venue;
+          copy.duration = repl.duration;
+          copy.warmup = repl.warmup;
+          copy.main = repl.main;
+          copy.note = repl.note;
+          copy.rainReplaced = true;
+        }
+      }
       const run = copy.type === 'speed' || copy.type === 'speedEnd' || copy.type === 'aerobic' || copy.type === 'longAerobic' || copy.type === 'test';
       const str = copy.type === 'lower' || copy.type === 'upper' || copy.type === 'jump';
-      if (wx.hot && run) {
-        copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：配速降5-8%、组间补水、心率上限-10bpm';
-        copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温降速/补水）'); });
-      } else if (wx.hot && str) {
-        copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：组数减1组、组间补水';
-        copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温减量）'); });
+      let weatherAdjusted = false;
+      if (!copy.rainReplaced) {
+        if (wx.hot && run) {
+          copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：配速降5-8%、组间补水、心率上限-10bpm';
+          copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温降速/补水）'); });
+          weatherAdjusted = true;
+        } else if (wx.hot && str) {
+          copy.note = (copy.note ? copy.note + ' | ' : '') + '高温≥30°C：组数减1组、组间补水';
+          copy.main = copy.main.map(function (m) { return withSuffix(m, '（高温减量）'); });
+          weatherAdjusted = true;
+        }
+        if (wx.windy && run) {
+          copy.note = (copy.note ? copy.note + ' | ' : '') + '大风≥5级：配速放缓、缩短冲刺距离/组数';
+          copy.main = copy.main.map(function (m) { return withSuffix(m, '（大风放缓）'); });
+          weatherAdjusted = true;
+        }
+        if (wx.sun && (run || str)) {
+          copy.note = (copy.note ? copy.note + ' | ' : '') + '强日照：避开直晒时段、多补水、强度降10%';
+          weatherAdjusted = true;
+        }
       }
-      if (wx.windy && run) {
-        copy.note = (copy.note ? copy.note + ' | ' : '') + '大风≥5级：配速放缓、缩短冲刺距离/组数';
-        copy.main = copy.main.map(function (m) { return withSuffix(m, '（大风放缓）'); });
-      }
-      if (wx.sun && (run || str)) {
-        copy.note = (copy.note ? copy.note + ' | ' : '') + '强日照：避开直晒时段、多补水、强度降10%';
-      }
+      copy.weatherAdjusted = weatherAdjusted || !!copy.rainReplaced;
       copy.weatherNote = wx.reasons.join('；');
     }
     return copy;
   }
   function weatherStatus() {
     const w = weathers[currentDate];
-    if (!w || (!w.temp && !w.wind && !w.sun)) return { level: 'none', label: '未填天气', reasons: [] };
+    if (!w || (!w.temp && !w.wind && !w.sun && !w.rain)) return { level: 'none', label: '未填天气', reasons: [] };
     const reasons = [];
     const hot = Number(w.temp) >= 30;
     const windy = Number(w.wind) >= 5;
-    const sun = w.sun === 'strong';
+    const sun = w.sun === '强日照';
+    const rain = w.rain && w.rain !== '无';
     if (hot) reasons.push('高温' + w.temp + '°C');
     if (windy) reasons.push('风力' + w.wind + '级');
     if (sun) reasons.push('强日照');
-    return { level: reasons.length ? 'adjusted' : 'none', label: reasons.length ? '已按天气调整' : '天气正常', reasons: reasons, hot: hot, windy: windy, sun: sun };
+    if (rain) reasons.push(w.rain);
+    return { level: reasons.length ? 'adjusted' : 'none', label: reasons.length ? '已按天气调整' : '天气正常', reasons: reasons, hot: hot, windy: windy, sun: sun, rain: rain };
   }
   // ---------- 今日 ----------
   function renderToday() {
@@ -490,7 +530,7 @@
     let html = '<div class="card-title">' + esc(p.title) + badge + '</div>';
     const adjBits = [];
     if (st.level === 'low' || st.level === 'light') adjBits.push('睡眠' + st.label);
-    if (wx.level === 'adjusted') adjBits.push('天气（' + wx.reasons.join('、') + '）');
+    if (p.weatherAdjusted) adjBits.push('天气（' + wx.reasons.join('、') + '）');
     html += '<div class="kv"><b>今日状态：</b><span class="val">' + esc(st.label) + (adjBits.length ? ' · 已自动调整：' + esc(adjBits.join(' + ')) : '') + '</span></div>';
     if (st.level !== 'none') html += '<div class="kv"><b>睡眠评测：</b><span class="val">自动 ' + (st.auto != null ? st.auto : '—') + ' · 个人 ' + (st.personal || '—') + ' · 综合 ' + (st.combined != null ? st.combined : '—') + '</span></div>';
     if (wx.level === 'adjusted') html += '<div class="kv"><b>天气：</b><span class="val">' + esc(wx.reasons.join(' · ')) + '</span></div>';
@@ -675,6 +715,8 @@
     html += '<label class="field-label">温度（°C）<input type="number" id="wx-temp" min="-20" max="50" value="' + esc(w.temp != null ? w.temp : '') + '" placeholder="如 32"></label>';
     html += '<label class="field-label">日照<select id="wx-sun"><option value="">未选</option>' + sunSel.map(function (s) { return '<option value="' + esc(s) + '"' + (w.sun === s ? ' selected' : '') + '>' + esc(s || '未选') + '</option>'; }).join('') + '</select></label>';
     html += '<label class="field-label">风力（级）<select id="wx-wind"><option value="">未选</option>' + [1, 2, 3, 4, 5, 6].map(function (v) { return '<option value="' + v + '"' + (Number(w.wind) === v ? ' selected' : '') + '>' + v + ' 级</option>'; }).join('') + '</select></label>';
+    const rainSel = ['', '无', '小雨', '中雨', '大雨', '雷雨'];
+    html += '<label class="field-label">降水<select id="wx-rain"><option value="">未选</option>' + rainSel.map(function (s) { return '<option value="' + esc(s) + '"' + (w.rain === s ? ' selected' : '') + '>' + esc(s || '未选') + '</option>'; }).join('') + '</select></label>';
     html += '<button class="btn primary" id="btn-save-weather">保存天气并调整今日计划</button><span class="form-msg" id="weatherMsg"></span>';
     html += '</div>';
     box.innerHTML = html;
@@ -683,7 +725,8 @@
     return {
       temp: $('wx-temp') ? Number($('wx-temp').value) : null,
       sun: $('wx-sun') ? $('wx-sun').value : '',
-      wind: $('wx-wind') ? Number($('wx-wind').value) : null
+      wind: $('wx-wind') ? Number($('wx-wind').value) : null,
+      rain: $('wx-rain') ? $('wx-rain').value : ''
     };
   }
   async function onSaveWeather() {

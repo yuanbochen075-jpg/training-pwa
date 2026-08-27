@@ -482,13 +482,76 @@
         { name: '原地纵跳CMJ', sets: 3, reps: '取最好成绩' },
         { name: '立定跳远', sets: 3, reps: '取最好成绩' }
       ],
-      note: '补测弹跳基线（距8/27力量已隔48h+今日恢复，腿基本恢复）。全程室内可完成：摸高用墙标尺或手机App、立定跳远用卷尺+地板、CMJ用App。短跑计时与1000m 顺延至下周。',
+      note: '补测弹跳基线（距8/27力量已隔48h+今日恢复，腿基本恢复）。全程室内可完成：摸高用墙标尺或手机App、立定跳远用卷尺+地板、CMJ用App。短跑计时顺延至回校后（W3）。',
       foods: [
         { when: '测试前1.5h', items: '香蕉1根 + 燕麦粥（少量）' },
         { when: '测试后30min', items: '西瓜/橙汁 + 牛奶/鸡蛋' },
         { when: '晚餐', items: '蓝莓/番茄 + 鱼/鸡胸 + 米饭' }
       ]
-    }  };
+    },
+    // ===== W2 居家版（8/31-9/6 回家，无操场/器械；待用户考察后微调）=====
+    '2026-08-31': {
+      type: 'speed', title: '速度日·居家版（技术+加速）', venue: '平直路段/家门口', duration: '50-60min',
+      warmup: '动态热身10min + A/B skip 各20m',
+      main: [
+        { name: '加速跑（平直路段）', sets: '4-6', reps: '30-40m', pace: '@80-90%', rest: '2-3min', note: '平直硬化路或草地，练起跑姿势' },
+        { name: '最大速度技术', sets: 3, reps: 'A/B skip+高抬腿+踝弹', pace: '各20-30m' },
+        { name: '轻快跑（有空间则做）', sets: 3, reps: '40-50m', pace: '@90%', rest: '3min', note: '没空间可省' },
+        { name: '放松跑', sets: 1, reps: '慢跑5min + 拉伸' }
+      ],
+      note: '居家版（无田径场）：加速跑在平直路段完成即可。30/60/100m 短跑计时顺延至回校后（W3）补。强度≤90%不全力。'
+    },
+    '2026-09-01': {
+      type: 'lower', title: '下肢+背·居家版（自重）', venue: '家', duration: '50-60min',
+      warmup: '髋/踝激活10min',
+      main: [
+        { name: '自重深蹲（可背包装水加重）', sets: 4, reps: '15-20次', pace: '自重+', rest: '1-2min', note: '膝盖对准脚尖' },
+        { name: '保加利亚分腿蹲', sets: 3, reps: '8-10次/侧', pace: '自重', rest: '1-2min' },
+        { name: '单腿臀桥', sets: 3, reps: '10次/侧', pace: '自重' },
+        { name: '单腿RDL（背包装水）', sets: 3, reps: '8次/侧', pace: '轻' },
+        { name: '反向划船（桌沿/床沿）或弹力带划船', sets: 4, reps: '6-10次', note: '没单杠就用这个替代引体' },
+        { name: '核心组合', sets: 3, reps: '平板/侧桥/死虫 各30-40s' }
+      ],
+      note: '居家版（无器械）：自重替代杠铃深蹲5×5，动作质量优先。有弹力带/小哑铃告诉我，我再加阻力。'
+    },
+    '2026-09-02': {
+      type: 'aerobic', title: '恢复日·Zone2（居家版）', venue: '家附近公路', duration: '30-40min',
+      warmup: '技术drills 5-10min',
+      main: [
+        { name: 'Zone2慢跑', sets: 1, reps: '30min', pace: '心率120-145' },
+        { name: '核心', sets: 3, reps: '各30s' }
+      ],
+      note: '居家版：公路/小区慢跑即可，能边跑边说话。'
+    },
+    '2026-09-03': {
+      type: 'speedEnd', title: '400m专项·居家版（法特莱克）', venue: '家附近路段', duration: '45-55min',
+      warmup: '动态热身10min',
+      main: [
+        { name: '快慢交替跑（法特莱克）', sets: 1, reps: '10×(60s快跑/60s慢跑)', pace: '快≈85%', note: '有200-300m平直段可改做5×200m@28-30s' },
+        { name: '轻松跑', sets: 1, reps: '10-15min' }
+      ],
+      note: '居家版：无田径场用快慢交替跑保持速度耐力；若找到200-300m平直段可按5×200m执行。找节奏不硬冲。'
+    },
+    '2026-09-04': {
+      type: 'jump', title: '弹跳+上肢·居家版（自重）', venue: '家/草地', duration: '45-55min',
+      warmup: '动态热身 + 小跳',
+      main: [
+        { name: '连续小跳/原地纵跳', sets: 3, reps: '共30-40次触地', pace: '低强度', note: '草地或软垫上做，护膝' },
+        { name: '台阶跳（矮凳/楼梯1级）', sets: 3, reps: '8次/侧', pace: '低' },
+        { name: '俯卧撑（标准/上斜）', sets: 4, reps: '8-15次' },
+        { name: '派克俯卧撑（肩）', sets: 3, reps: '8次' },
+        { name: '水瓶/背包侧平举+俯身飞鸟', sets: 3, reps: '12-15次' },
+        { name: '自重提踵', sets: 3, reps: '15-20次' }
+      ],
+      note: '居家版：跳箱→台阶/矮凳，卧推/推举→俯卧撑变式。跳跃选草地/软垫，保护膝盖。'
+    },
+    '2026-09-05': {
+      type: 'longAerobic', title: '可选·轻松有氧（居家版）', venue: '家附近', duration: '30-45min',
+      warmup: '慢走5min',
+      main: [{ name: '快走或Zone2慢跑', sets: 1, reps: '30-45min', pace: '心率120-140' }],
+      note: '保持轻松，别累'
+    }
+  };
 
   // 每个练习项的「侧重点」与「强度」标注（名称关键词规则；override/自定义未标注时也用此函数）
   function annotateItem(m) {

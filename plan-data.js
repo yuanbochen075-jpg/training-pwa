@@ -492,67 +492,89 @@
         { when: '晚餐', items: '正常蛋白质餐（鸡胸/鱼/鸡蛋）+ 一小把坚果' }
       ]
     },
-    // ===== W2 居家版（8/31-9/6；塑胶弯道跑道/有单杠/无哑铃/无坡）=====
+    // ===== W2 每日模板（8/31-9/6 居家；慢跑+循环+臀桥；无器械）=====
     '2026-08-31': {
-      type: 'speed', title: '速度技术日·居家版（弯道不冲）', venue: '小区塑胶跑道', duration: '40-50min',
-      warmup: '动态热身10min',
+      type: 'aerobic', title: '全身循环① + 慢跑（居家模板）', venue: '家/小区塑胶跑道', duration: '45-55min',
+      warmup: '动态热身5-8min',
       main: [
-        { name: '马克操组合', sets: 3, reps: 'A-skip→高抬腿→后踢腿→侧向 各20m', pace: '技术', note: '直道段做' },
-        { name: '最大速度技术', sets: 3, reps: '车轮跑+踝弹+快频原地跑 各20-30s', pace: '技术' },
-        { name: '轻快跑（仅直道安全段）', sets: 3, reps: '20-30m', pace: '@85%', rest: '2min', note: '弯道不冲，安全第一' },
-        { name: '放松跑', sets: 1, reps: '慢跑5min + 拉伸' }
+        { name: '臀桥质量组', sets: 3, reps: '单腿15-20/侧 + 双腿15', note: '顶峰收缩1-2s慢放，可拆到全天做' },
+        { name: '循环·引体向上', sets: '2-3轮', reps: '10次' },
+        { name: '循环·深蹲（3s慢下）', sets: '2-3轮', reps: '20次' },
+        { name: '循环·俯卧撑', sets: '2-3轮', reps: '20次' },
+        { name: '循环·Pogo小跳', sets: '2-3轮', reps: '30次', note: '塑胶跑道做，护踝' },
+        { name: '循环·登山跑', sets: '2-3轮', reps: '40s' },
+        { name: '循环·开合跳', sets: '2-3轮', reps: '60s' },
+        { name: '慢跑收尾', sets: 1, reps: '30min', pace: '心率130-140，能说话' }
       ],
-      note: '居家版·弯道跑道：不做全力冲刺，专注速度技术（A/B skip、高抬腿、车轮跑）。30/60/100m 短跑计时顺延回校后W3补。'
+      note: '每日模板·循环日：2轮起步，动作变形就停；状态好最多3轮。慢跑心率说话，配速不重要。'
     },
     '2026-09-01': {
-      type: 'lower', title: '下肢+背·居家版（自重+单杠）', venue: '家', duration: '50-60min',
-      warmup: '髋/踝激活10min',
+      type: 'aerobic', title: '轻恢复·慢跑+臀桥（居家模板）', venue: '小区塑胶跑道/家', duration: '35-40min',
+      warmup: '动态热身5min',
       main: [
-        { name: '自重深蹲（可背包装水加重）', sets: 4, reps: '15-20次', pace: '自重+', rest: '1-2min', note: '膝盖对准脚尖' },
-        { name: '保加利亚分腿蹲', sets: 3, reps: '8-10次/侧', pace: '自重', rest: '1-2min' },
-        { name: '单腿臀桥', sets: 3, reps: '10次/侧', pace: '自重' },
-        { name: '单腿RDL（背包装水）', sets: 3, reps: '8次/侧', pace: '轻' },
-        { name: '引体向上（单杠）', sets: 4, reps: '尽力组 3-8次', note: '做不动用跳起/慢放辅助' },
-        { name: '核心组合', sets: 3, reps: '悬垂举腿+平板+侧桥 各30-45s' }
+        { name: '臀桥质量组', sets: 3, reps: '单腿15-20/侧 + 双腿15', note: '可拆到全天做' },
+        { name: 'Zone2慢跑', sets: 1, reps: '30min', pace: '心率130-140，能说话' },
+        { name: '核心（可选）', sets: 2, reps: '平板/侧桥 各30s' }
       ],
-      note: '居家版：有单杠→引体向上替代反向划船。动作质量优先，离心放慢。'
+      note: '每日模板·轻日：无循环，纯恢复+有氧。'
     },
     '2026-09-02': {
-      type: 'aerobic', title: '恢复日·Zone2（居家版）', venue: '小区塑胶跑道', duration: '30-40min',
-      warmup: '技术drills 5-10min',
+      type: 'aerobic', title: '全身循环② + 慢跑（居家模板）', venue: '家/小区塑胶跑道', duration: '45-55min',
+      warmup: '动态热身5-8min',
       main: [
-        { name: 'Zone2慢跑', sets: 1, reps: '30min', pace: '心率120-145' },
-        { name: '核心', sets: 3, reps: '各30s' }
+        { name: '臀桥质量组', sets: 3, reps: '单腿15-20/侧 + 双腿15', note: '顶峰收缩1-2s慢放' },
+        { name: '循环·引体向上', sets: '2-3轮', reps: '10次' },
+        { name: '循环·深蹲（3s慢下）', sets: '2-3轮', reps: '20次' },
+        { name: '循环·俯卧撑', sets: '2-3轮', reps: '20次' },
+        { name: '循环·Pogo小跳', sets: '2-3轮', reps: '30次', note: '塑胶跑道做' },
+        { name: '循环·登山跑', sets: '2-3轮', reps: '40s' },
+        { name: '循环·开合跳', sets: '2-3轮', reps: '60s' },
+        { name: '慢跑收尾', sets: 1, reps: '30min', pace: '心率130-140' }
       ],
-      note: '居家版：弯道跑道慢跑即可，能边跑边说话。'
+      note: '每日模板·循环日：2轮起步，动作变形就停；状态好最多3轮。'
     },
     '2026-09-03': {
-      type: 'speedEnd', title: '400m专项·居家版（法特莱克）', venue: '小区塑胶跑道', duration: '45-55min',
-      warmup: '动态热身10min',
+      type: 'aerobic', title: '轻恢复·慢跑+臀桥（居家模板）', venue: '小区塑胶跑道/家', duration: '35-40min',
+      warmup: '动态热身5min',
       main: [
-        { name: '快慢交替跑（法特莱克）', sets: 1, reps: '10×(60s快/60s慢)', pace: '快≈80-85%', note: '直道稍快、弯道放慢' },
-        { name: '轻松跑', sets: 1, reps: '10-15min' }
+        { name: '臀桥质量组', sets: 3, reps: '单腿15-20/侧 + 双腿15', note: '可拆到全天做' },
+        { name: 'Zone2慢跑', sets: 1, reps: '30min', pace: '心率130-140' },
+        { name: '核心（可选）', sets: 2, reps: '平板/侧桥 各30s' }
       ],
-      note: '居家版：弯道跑道用快慢交替保持速度耐力（直道快、弯道慢），找节奏不硬冲。'
+      note: '每日模板·轻日：无循环，纯恢复+有氧。'
     },
     '2026-09-04': {
-      type: 'jump', title: '弹跳+上肢·居家版（塑胶跑道跳跃）', venue: '小区塑胶跑道', duration: '45-55min',
-      warmup: '动态热身 + 小跳',
+      type: 'aerobic', title: '全身循环③ + 慢跑（居家模板）', venue: '家/小区塑胶跑道', duration: '45-55min',
+      warmup: '动态热身5-8min',
       main: [
-        { name: '连续小跳/原地纵跳', sets: 3, reps: '共30-40次触地', pace: '低强度', note: '塑胶跑道软面护膝' },
-        { name: '单腿跳+侧向跳', sets: 3, reps: '各10次/侧', pace: '低' },
-        { name: '俯卧撑（标准/宽距/窄距）', sets: 4, reps: '8-15次' },
-        { name: '派克俯卧撑（肩）', sets: 3, reps: '8次' },
-        { name: '水瓶侧平举+俯身飞鸟', sets: 3, reps: '12-15次', pace: '轻' },
-        { name: '引体向上或自重提踵', sets: 3, reps: '6-10次 / 15-20次' }
+        { name: '臀桥质量组', sets: 3, reps: '单腿15-20/侧 + 双腿15', note: '顶峰收缩1-2s慢放' },
+        { name: '循环·引体向上', sets: '2-3轮', reps: '10次' },
+        { name: '循环·深蹲（3s慢下）', sets: '2-3轮', reps: '20次' },
+        { name: '循环·俯卧撑', sets: '2-3轮', reps: '20次' },
+        { name: '循环·Pogo小跳', sets: '2-3轮', reps: '30次', note: '塑胶跑道做' },
+        { name: '循环·登山跑', sets: '2-3轮', reps: '40s' },
+        { name: '循环·开合跳', sets: '2-3轮', reps: '60s' },
+        { name: '慢跑收尾', sets: 1, reps: '30min', pace: '心率130-140' }
       ],
-      note: '居家版：跳跃全在塑胶跑道做（软面护膝）；台阶跳取消改连续跳。上肢用俯卧撑变式+单杠。'
+      note: '每日模板·循环日：2轮起步，动作变形就停；状态好最多3轮。'
     },
     '2026-09-05': {
-      type: 'longAerobic', title: '可选·轻松有氧（居家版）', venue: '小区塑胶跑道', duration: '30-45min',
+      type: 'aerobic', title: '可选·轻有氧+臀桥（居家模板）', venue: '小区塑胶跑道/家', duration: '30-40min',
       warmup: '慢走5min',
-      main: [{ name: '快走或Zone2慢跑', sets: 1, reps: '30-45min', pace: '心率120-140' }],
-      note: '保持轻松，别累'
+      main: [
+        { name: '臀桥质量组', sets: 2, reps: '单腿15/侧 + 双腿15' },
+        { name: '快走或慢跑', sets: 1, reps: '30min', pace: '心率120-140' }
+      ],
+      note: '状态好可加1轮轻量循环；否则纯恢复。'
+    },
+    '2026-09-06': {
+      type: 'aerobic', title: '可选·轻量循环或全休', venue: '家/小区塑胶跑道', duration: '0-30min',
+      warmup: '动态热身5min',
+      main: [
+        { name: '轻量循环（1-2轮）', sets: '1-2轮', reps: '全套或半套', note: '状态差直接全休' },
+        { name: '臀桥质量组', sets: 2, reps: '单腿15/侧 + 双腿15' }
+      ],
+      note: '本周收尾：状态好做1-2轮轻量循环，疲惫就全休。睡眠要够，下周回校恢复正规训练。'
     }
   };
 
